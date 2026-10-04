@@ -40,7 +40,6 @@ sensor:
     id: load_percentage
     type: load_percent
     unit_of_measurement: "%"
-    device_class: power_factor
     state_class: measurement
     accuracy_decimals: 0
 

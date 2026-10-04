@@ -5,7 +5,7 @@ from esphome.const import (
     CONF_TYPE,
     DEVICE_CLASS_BATTERY,
     DEVICE_CLASS_VOLTAGE,
-    DEVICE_CLASS_POWER_FACTOR,
+    DEVICE_CLASS_FREQUENCY,
     DEVICE_CLASS_DURATION,
     DEVICE_CLASS_POWER,
     DEVICE_CLASS_EMPTY,
@@ -41,8 +41,8 @@ SENSOR_TYPES = {
         "accuracy_decimals": 1,
     },
     "load_percent": {
+        # No device class: Home Assistant has none for load, and power_factor is wrong
         "unit": UNIT_PERCENT,
-        "device_class": DEVICE_CLASS_POWER_FACTOR,
         "accuracy_decimals": 0,
     },
     "runtime": {
@@ -52,6 +52,7 @@ SENSOR_TYPES = {
     },
     "frequency": {
         "unit": UNIT_HERTZ,
+        "device_class": DEVICE_CLASS_FREQUENCY,
         "accuracy_decimals": 1,
     },
     "battery_voltage": {
