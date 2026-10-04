@@ -68,7 +68,7 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 |--------|--------|----------|-----------|----------------|
 | **APC** | Back-UPS ES Series, Smart-UPS | APC HID | 0x051D | ✅ Confirmed |
 | **CyberPower** | CP1500EPFCLCD, CP1000PFCLCD | CyberPower HID | 0x0764 | ✅ Confirmed |
-| **Eaton/MGE** | Ellipse, 3S, 5E, 5S, 5SC, 5P/5PX, 9E/9SX/9PX | Eaton HID | 0x0463 | 🔧 Model dependent |
+| **Eaton/MGE** | 5E 1500i (tested), other 5E, Ellipse, 3S, 5S, 5SC, 5P/5PX, 9E/9SX/9PX | Eaton HID | 0x0463 | 🔧 Model dependent (works on 5E 1500i) |
 | **Tripp Lite** | SMART1500LCDT, UPS series | Generic HID | 0x09AE | ⚠️ Limited |
 | **Belkin** | Older USB UPS models | Generic HID | 0x050D | ⚠️ Limited |
 
@@ -77,8 +77,10 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 - 🔧 **Model dependent**: enable/disable/mute when the UPS exposes the control (no beeper test)
 - ⚠️ **Limited**: Basic support via generic HID (device-dependent functionality)
 
-> The Eaton HID protocol is new. It was checked against a real Eaton 9PX report descriptor and
-> NUT's parser, but not yet on every Eaton model. See [Eaton UPS Notes](#eaton-ups-notes).
+> The Eaton HID protocol is new. It was tested on an Eaton 5E 1500i (auto-detection, every
+> value the 5E reports, the switch to battery power, and the beeper enable/disable/mute
+> buttons) and checked against a real Eaton 9PX report descriptor with NUT's parser. Other
+> Eaton models are untested so far. See [Eaton UPS Notes](#eaton-ups-notes).
 
 ### Protocol Compatibility Matrix
 
@@ -191,8 +193,13 @@ as long as it uses these paths.
   countdown that switches the load off. The `ups_timer_*` sensors show running countdowns.
 - **Firmware 2.02 units** (e.g. 9PX, 9SX) have a reduced and a full report descriptor; the
   full one is used, as in NUT.
+- **5E series:** reports battery level, runtime, load, input and output voltage, output
+  frequency, beeper status and online/charging state. It has no serial number, battery voltage,
+  input sensitivity or battery test over USB. It charges constantly, so `charging` turns off at
+  100%.
 
-To check what your UPS provides, set `ups_hid.eaton: DEBUG`. At detection, the log lists which
+To check what your UPS provides, set `ups_hid.eaton: DEBUG`. At detection (at startup and when
+the UPS is plugged back in), the log lists which
 HID path feeds each value. For a full listing of every path (same format as NUT
 `usbhid-ups -DD`), set the logger level to `VERBOSE`. Please include that log when reporting
 a problem with an Eaton model.
