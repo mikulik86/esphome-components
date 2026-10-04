@@ -35,6 +35,7 @@ void ProtocolFactory::ensure_initialized() {
 
     register_apc_hid_protocol();
     register_cyberpower_hid_protocol();
+    register_eaton_hid_protocol();
     register_generic_hid_protocol();
 
     ESP_LOGD(FACTORY_TAG, "Protocol factory initialized: %zu vendor(s), %zu fallback protocol(s)",

@@ -96,9 +96,10 @@ If you prefer manual collection, the issue template provides detailed instructio
 
 1. **Study existing protocols**: Review `apc_hid_protocol.cpp` or `cyberpower_protocol.cpp`
 2. **Use the protocol base class**: Inherit from `UpsProtocolBase`
-3. **Register your protocol**: Use the `REGISTER_UPS_PROTOCOL_FOR_VENDOR` macro
+3. **Register your protocol**: Use the `REGISTER_UPS_PROTOCOL_FOR_VENDOR` macro, then declare and call its `register_<name>()` function (see `protocol_factory.h`)
 4. **Follow patterns**: Match existing code style and error handling
 5. **Add constants properly**: Use `ups_constants.h` for shared values
+6. **Report IDs differ per model?** Locate values by HID usage path instead: see `hid_report_descriptor.h` and `protocol_eaton.cpp`
 
 ### Code Quality Standards
 

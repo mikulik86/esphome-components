@@ -33,6 +33,7 @@ logger:
     ups_hid: DEBUG
     ups_hid.apc: DEBUG
     ups_hid.cyberpower: DEBUG
+    ups_hid.eaton: DEBUG
     ups_hid.generic: DEBUG
     usb_host: DEBUG
 

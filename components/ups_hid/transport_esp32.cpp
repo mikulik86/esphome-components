@@ -1,9 +1,12 @@
 #include "transport_esp32.h"
+#include "constants_hid.h"
 #include "constants_ups.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 
 #ifdef USE_ESP32
+
+#include <new>
 
 namespace esphome {
 namespace ups_hid {
@@ -408,6 +411,103 @@ esp_err_t Esp32UsbTransport::get_string_descriptor(uint8_t string_index,
     return ret;
 }
 
+esp_err_t Esp32UsbTransport::get_hid_report_descriptor(uint8_t descriptor_index,
+                                                     std::vector<uint8_t>& descriptor) {
+    descriptor.clear();
+
+    if (!device_.dev_hdl) {
+        set_last_error("USB device not ready");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    const uint8_t bmRequestType = USB_BM_REQUEST_TYPE_DIR_IN |
+                                 USB_BM_REQUEST_TYPE_TYPE_STANDARD |
+                                 USB_BM_REQUEST_TYPE_RECIP_INTERFACE;
+
+    // Descriptor length, found the way NUT libusb1.c does it: prefer the HID descriptor
+    // embedded in the configuration descriptor (some Eaton units stall the direct
+    // request). That copy only describes descriptor 0, so alternates ask the device.
+    uint16_t length = descriptor_index == 0 ? report_descriptor_length_from_config() : 0;
+    if (length == 0) {
+        uint8_t hid_descriptor[HID_CLASS_DESCRIPTOR_LENGTH] = {0};
+        size_t received = sizeof(hid_descriptor);
+        esp_err_t ret = submit_control_transfer(bmRequestType, USB_B_REQUEST_GET_DESCRIPTOR,
+                                                (HID_DESCRIPTOR_TYPE_HID << 8) | descriptor_index,
+                                                device_.interface_num, hid_descriptor, &received,
+                                                timing::USB_CONTROL_TRANSFER_TIMEOUT_MS);
+        if (ret == ESP_OK && received >= HID_CLASS_DESCRIPTOR_LENGTH &&
+            hid_descriptor[1] == HID_DESCRIPTOR_TYPE_HID) {
+            length = hid_descriptor[7] | (hid_descriptor[8] << 8);
+        }
+    }
+
+    if (length == 0) {
+        set_last_error("No HID descriptor for report descriptor " + std::to_string(descriptor_index));
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (length > limits::MAX_HID_REPORT_DESCRIPTOR_SIZE) {
+        ESP_LOGW(ESP32_USB_TAG, "Report descriptor %u is %u bytes, reading the first %zu",
+                 static_cast<unsigned>(descriptor_index), static_cast<unsigned>(length),
+                 limits::MAX_HID_REPORT_DESCRIPTOR_SIZE);
+        length = static_cast<uint16_t>(limits::MAX_HID_REPORT_DESCRIPTOR_SIZE);
+    }
+
+    descriptor.resize(length);
+    size_t received = length;
+    esp_err_t ret = submit_control_transfer(bmRequestType, USB_B_REQUEST_GET_DESCRIPTOR,
+                                            (HID_DESCRIPTOR_TYPE_REPORT << 8) | descriptor_index,
+                                            device_.interface_num, descriptor.data(), &received,
+                                            timing::HID_REPORT_DESCRIPTOR_TIMEOUT_MS);
+    if (ret != ESP_OK || received == 0) {
+        descriptor.clear();
+        set_last_error("Failed to read HID report descriptor " + std::to_string(descriptor_index));
+        return ret != ESP_OK ? ret : ESP_FAIL;
+    }
+
+    if (received < length) {
+        // Accepted like NUT does: parse what the device sent
+        ESP_LOGW(ESP32_USB_TAG, "Report descriptor %u shorter than announced (%zu of %u bytes)",
+                 static_cast<unsigned>(descriptor_index), received, static_cast<unsigned>(length));
+        descriptor.resize(received);
+    }
+
+    ESP_LOGD(ESP32_USB_TAG, "HID report descriptor %u: %zu bytes",
+             static_cast<unsigned>(descriptor_index), descriptor.size());
+    return ESP_OK;
+}
+
+uint16_t Esp32UsbTransport::get_device_release() const {
+    std::lock_guard<std::mutex> lock(device_mutex_);
+    return device_.device_release;
+}
+
+uint16_t Esp32UsbTransport::report_descriptor_length_from_config() const {
+    const usb_config_desc_t *config_desc;
+    if (usb_host_get_active_config_descriptor(device_.dev_hdl, &config_desc) != ESP_OK) {
+        return 0;
+    }
+
+    int offset = 0;
+    const usb_intf_desc_t *intf_desc = usb_parse_interface_descriptor(
+        config_desc, device_.interface_num, 0, &offset);
+    if (!intf_desc) {
+        return 0;
+    }
+
+    // The HID descriptor sits between the interface descriptor and its endpoints
+    const usb_standard_desc_t *desc = reinterpret_cast<const usb_standard_desc_t *>(intf_desc);
+    while ((desc = usb_parse_next_descriptor(desc, config_desc->wTotalLength, &offset)) != nullptr) {
+        if (desc->bDescriptorType == USB_B_DESCRIPTOR_TYPE_INTERFACE) {
+            break;
+        }
+        if (desc->bDescriptorType == HID_DESCRIPTOR_TYPE_HID && desc->bLength >= HID_CLASS_DESCRIPTOR_LENGTH) {
+            const uint8_t *raw = reinterpret_cast<const uint8_t *>(desc);
+            return raw[7] | (raw[8] << 8);
+        }
+    }
+    return 0;
+}
+
 std::string Esp32UsbTransport::get_last_error() const {
     std::lock_guard<std::mutex> lock(error_mutex_);
     return last_error_;
@@ -618,62 +718,128 @@ esp_err_t Esp32UsbTransport::find_endpoints() {
     return ESP_OK;
 }
 
+namespace {
+
+// Completion state shared with the USB client task. Heap allocated so a caller that
+// stops waiting can hand cleanup over to the callback: ESP-IDF control transfers have
+// no timeout, so an unanswered request may complete long after the caller returned.
+enum ControlTransferState : uint8_t {
+    CONTROL_TRANSFER_PENDING,
+    CONTROL_TRANSFER_DONE,
+    CONTROL_TRANSFER_ABANDONED,
+};
+
+struct ControlTransferContext {
+    SemaphoreHandle_t done;
+    std::atomic<uint8_t> state;
+};
+
+// Data stage buffer size for IN transfers is rounded up to the endpoint 0 packet
+// size, like the ESP-IDF enumeration driver does (64 covers every full-speed EP0)
+constexpr int CONTROL_IN_BUFFER_GRANULARITY = 64;
+
+void release_control_transfer(usb_transfer_t *transfer) {
+    auto *ctx = static_cast<ControlTransferContext *>(transfer->context);
+    vSemaphoreDelete(ctx->done);
+    delete ctx;
+    usb_host_transfer_free(transfer);
+}
+
+void control_transfer_done(usb_transfer_t *transfer) {
+    auto *ctx = static_cast<ControlTransferContext *>(transfer->context);
+    if (ctx->state.exchange(CONTROL_TRANSFER_DONE) == CONTROL_TRANSFER_ABANDONED) {
+        release_control_transfer(transfer);
+        return;
+    }
+    xSemaphoreGive(ctx->done);
+}
+
+}  // namespace
+
 esp_err_t Esp32UsbTransport::submit_control_transfer(uint8_t bmRequestType, uint8_t bRequest,
                                                    uint16_t wValue, uint16_t wIndex,
-                                                   uint8_t* data, size_t data_len,
+                                                   uint8_t* data, size_t* data_len,
                                                    uint32_t timeout_ms) {
-    std::lock_guard<std::mutex> lock(device_mutex_);
-    
     if (!device_.dev_hdl) {
         return ESP_ERR_INVALID_STATE;
     }
+    if (!data_len || (*data_len > 0 && !data) || *data_len > UINT16_MAX) {
+        return ESP_ERR_INVALID_ARG;
+    }
     
-    usb_transfer_t *transfer;
-    esp_err_t ret = usb_host_transfer_alloc(sizeof(usb_setup_packet_t) + data_len, 0, &transfer);
+    const bool is_in = (bmRequestType & USB_BM_REQUEST_TYPE_DIR_IN) != 0;
+    const size_t length = *data_len;
+    const size_t buffer_length = is_in ? usb_round_up_to_mps(length, CONTROL_IN_BUFFER_GRANULARITY) : length;
+    
+    usb_transfer_t *transfer = nullptr;
+    esp_err_t ret = usb_host_transfer_alloc(sizeof(usb_setup_packet_t) + buffer_length, 0, &transfer);
     if (ret != ESP_OK) {
         set_last_error("Transfer alloc failed: " + std::string(esp_err_to_name(ret)));
         return ret;
     }
     
-    // Setup packet
-    usb_setup_packet_t *setup = (usb_setup_packet_t *)transfer->data_buffer;
+    auto *ctx = new (std::nothrow) ControlTransferContext{xSemaphoreCreateBinary(), {CONTROL_TRANSFER_PENDING}};
+    if (!ctx || !ctx->done) {
+        if (ctx) {
+            delete ctx;
+        }
+        usb_host_transfer_free(transfer);
+        return ESP_ERR_NO_MEM;
+    }
+    
+    usb_setup_packet_t *setup = reinterpret_cast<usb_setup_packet_t *>(transfer->data_buffer);
     setup->bmRequestType = bmRequestType;
     setup->bRequest = bRequest;
     setup->wValue = wValue;
     setup->wIndex = wIndex;
-    setup->wLength = data_len;
-    
-    if (data_len > 0 && data) {
-        if (bmRequestType & USB_BM_REQUEST_TYPE_DIR_IN) {
-            // IN transfer - device to host
-            memset(transfer->data_buffer + sizeof(usb_setup_packet_t), 0, data_len);
-        } else {
-            // OUT transfer - host to device
-            memcpy(transfer->data_buffer + sizeof(usb_setup_packet_t), data, data_len);
-        }
+    setup->wLength = static_cast<uint16_t>(length);
+    if (!is_in && length > 0) {
+        memcpy(transfer->data_buffer + sizeof(usb_setup_packet_t), data, length);
     }
     
     transfer->device_handle = device_.dev_hdl;
     transfer->bEndpointAddress = 0; // Control endpoint
-    transfer->callback = nullptr;
-    transfer->context = nullptr;
-    transfer->num_bytes = sizeof(usb_setup_packet_t) + data_len;
+    transfer->num_bytes = sizeof(usb_setup_packet_t) + buffer_length;
     transfer->timeout_ms = timeout_ms;
+    transfer->context = ctx;
+    transfer->callback = control_transfer_done;
     
     ret = usb_host_transfer_submit_control(device_.client_hdl, transfer);
     if (ret != ESP_OK) {
-        usb_host_transfer_free(transfer);
+        release_control_transfer(transfer);
         set_last_error("Control transfer submit failed: " + std::string(esp_err_to_name(ret)));
         return ret;
     }
     
-    // Copy response data back
-    if (data_len > 0 && data && (bmRequestType & USB_BM_REQUEST_TYPE_DIR_IN)) {
-        memcpy(data, transfer->data_buffer + sizeof(usb_setup_packet_t), data_len);
+    if (xSemaphoreTake(ctx->done, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
+        if (ctx->state.exchange(CONTROL_TRANSFER_ABANDONED) == CONTROL_TRANSFER_PENDING) {
+            ESP_LOGW(ESP32_USB_TAG, "Control transfer timeout (bRequest=0x%02X, wValue=0x%04X)", bRequest, wValue);
+            return ESP_ERR_TIMEOUT;  // control_transfer_done() frees the transfer
+        }
+        // Completed just after the timeout: the callback is giving the semaphore
+        xSemaphoreTake(ctx->done, portMAX_DELAY);
     }
     
-    usb_host_transfer_free(transfer);
-    return ESP_OK;
+    if (transfer->status == USB_TRANSFER_STATUS_COMPLETED) {
+        const size_t actual = transfer->actual_num_bytes > static_cast<int>(sizeof(usb_setup_packet_t))
+                                  ? transfer->actual_num_bytes - sizeof(usb_setup_packet_t)
+                                  : 0;
+        if (is_in) {
+            *data_len = std::min(actual, length);
+            memcpy(data, transfer->data_buffer + sizeof(usb_setup_packet_t), *data_len);
+        }
+        ret = ESP_OK;
+    } else {
+        ESP_LOGD(ESP32_USB_TAG, "Control transfer failed (bRequest=0x%02X, wValue=0x%04X, status=%d)",
+                 bRequest, wValue, transfer->status);
+        if (is_in) {
+            *data_len = 0;
+        }
+        ret = ESP_FAIL;
+    }
+    
+    release_control_transfer(transfer);
+    return ret;
 }
 
 void Esp32UsbTransport::usb_client_event_callback(const usb_host_client_event_msg_t* event_msg, void* arg) {
@@ -735,9 +901,11 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
     if (ret == ESP_OK) {
         device_.vendor_id = device_desc->idVendor;
         device_.product_id = device_desc->idProduct;
+        device_.device_release = device_desc->bcdDevice;
         
-        ESP_LOGI(ESP32_USB_TAG, "USB device opened: VID=0x%04X, PID=0x%04X, Speed=%d", 
-                 device_.vendor_id, device_.product_id, dev_info.speed);
+        ESP_LOGI(ESP32_USB_TAG, "USB device opened: VID=0x%04X, PID=0x%04X, release=%X.%02X, Speed=%d",
+                 device_.vendor_id, device_.product_id, device_.device_release >> 8,
+                 device_.device_release & 0xFF, dev_info.speed);
         
         // Check if this is a UPS device (HID class)
         if (device_desc->bDeviceClass == USB_CLASS_HID || 
@@ -782,6 +950,7 @@ void Esp32UsbTransport::handle_device_gone(usb_device_handle_t dev_hdl) {
         device_.address = 0;
         device_.vendor_id = 0;
         device_.product_id = 0;
+        device_.device_release = 0;
         
         ESP_LOGI(ESP32_USB_TAG, "USB device disconnected and cleaned up");
     }

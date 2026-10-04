@@ -110,6 +110,7 @@ private:
 // Built-in protocols (defined by the macro invocations in protocol_*.cpp)
 void register_apc_hid_protocol();
 void register_cyberpower_hid_protocol();
+void register_eaton_hid_protocol();
 void register_generic_hid_protocol();
 
 // Define the registration function for a vendor-specific protocol

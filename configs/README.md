@@ -167,6 +167,13 @@ CyberPower CP1500 series optimizations:
 - **Device-specific text sensor**: `battery_mfr_date` (separate from UPS date)
 - Rich monitoring script with comprehensive status logging
 
+#### `device_types/eaton.yaml`
+Eaton / MGE UPS optimizations (Ellipse, 3S, 5E, 5S, 5SC, 5P/5PX, 9E/9SX/9PX):
+- Forces the Eaton HID protocol (values located through the UPS's HID report descriptor)
+- **Power calculation**: load in watts from the UPS's own nominal active power
+- Protocol debugging (`ups_hid.eaton: DEBUG` shows which HID path feeds each value)
+- Requires `extended_sensors.yaml` (uses `ups_realpower_nominal`)
+
 ---
 
 ## 📊 **Complete Sensor Summary**
@@ -302,6 +309,12 @@ Complete APC UPS production configuration with LED status indication:
 - Custom automation examples and notification setup
 - Choice of standard or grouped entity layout
 - APC-specific timer monitoring and power outage handling
+
+### `examples/eaton-ups-monitor.yaml`
+Complete Eaton UPS production configuration with LED status indication:
+- European defaults, standard sensor packages, controls and NUT server
+- No delay configuration package: Eaton UPSes have no stored delays over USB HID
+- Countdown warning automation using the shutdown timer sensor
 
 ### `examples/rack-ups-monitor.yaml`
 Complete CyberPower UPS production configuration with LED status indication:

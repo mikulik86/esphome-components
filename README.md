@@ -6,11 +6,11 @@ A collection of ESPHome components for various hardware integrations and monitor
 
 ### 🔋 UPS HID Component (`ups_hid`)
 
-Monitor UPS devices via direct USB connection on ESP32-S3. Supports APC, CyberPower, and generic HID UPS devices with real-time monitoring of battery status, power conditions, and device information.
+Monitor UPS devices via direct USB connection on ESP32-S3. Supports APC, CyberPower, Eaton, and generic HID UPS devices with real-time monitoring of battery status, power conditions, and device information.
 
 **Key Features:**
 - **Real-time UPS monitoring**: Battery, voltage, load, runtime, and 15+ sensors
-- **Multi-protocol support**: APC HID, CyberPower HID, Generic HID with auto-detection
+- **Multi-protocol support**: APC HID, CyberPower HID, Eaton HID, Generic HID with auto-detection
 - **UPS Control**: Beeper control (enable/disable/mute/test) and battery testing
 - ⏱️ **Delay configuration**: Configure UPS shutdown, start, and reboot delays via USB HID
 - **Home Assistant integration**: Full device discovery and management
@@ -52,7 +52,7 @@ Modular, maintainable ESPHome configuration system using packages. Build configu
 **Key Features:**
 - **Modular packages**: Core, sensors, controls, device-specific optimizations
 - **Grouped organization**: Optional entity grouping for cleaner web interface
-- **Example configurations**: Production-ready configs for APC, CyberPower, and rack UPS
+- **Example configurations**: Production-ready configs for APC, CyberPower, Eaton, and rack UPS
 - **Regional defaults**: Voltage/frequency presets for different regions
 - **Smart LED integration**: Automatic visual status indication
 
@@ -95,6 +95,7 @@ configs/
 ├── examples/               # Example device configurations
 │   ├── apc-ups-monitor.yaml
 │   ├── cyberpower-ups-monitor.yaml
+│   ├── eaton-ups-monitor.yaml
 │   └── rack-ups-monitor.yaml
 └── ...                     # Additional modular packages
 

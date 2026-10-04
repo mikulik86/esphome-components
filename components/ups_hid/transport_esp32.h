@@ -42,9 +42,13 @@ public:
                            const uint8_t* data, size_t data_len,
                            uint32_t timeout_ms = 1000) override;
     
-    esp_err_t get_string_descriptor(uint8_t string_index, 
+    esp_err_t get_string_descriptor(uint8_t string_index,
                                   std::string& result) override;
-    
+
+    esp_err_t get_hid_report_descriptor(uint8_t descriptor_index,
+                                      std::vector<uint8_t>& descriptor) override;
+    uint16_t get_device_release() const override;
+
     std::string get_last_error() const override;
 
 private:
@@ -58,6 +62,7 @@ private:
         uint8_t ep_out{0};
         uint16_t vendor_id{0};
         uint16_t product_id{0};
+        uint16_t device_release{0};  // bcdDevice
         uint16_t max_packet_size_in{0};
         uint16_t max_packet_size_out{0};
         usb_speed_t speed{USB_SPEED_LOW};
@@ -92,10 +97,12 @@ private:
     esp_err_t find_endpoints();
     
     void set_last_error(const std::string& error);
+    // data_len: buffer size in, bytes received out (IN transfers)
     esp_err_t submit_control_transfer(uint8_t bmRequestType, uint8_t bRequest,
                                     uint16_t wValue, uint16_t wIndex,
-                                    uint8_t* data, size_t data_len,
+                                    uint8_t* data, size_t* data_len,
                                     uint32_t timeout_ms);
+    uint16_t report_descriptor_length_from_config() const;
 };
 
 } // namespace ups_hid

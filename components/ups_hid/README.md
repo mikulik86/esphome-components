@@ -68,13 +68,17 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 |--------|--------|----------|-----------|----------------|
 | **APC** | Back-UPS ES Series, Smart-UPS | APC HID | 0x051D | ✅ Confirmed |
 | **CyberPower** | CP1500EPFCLCD, CP1000PFCLCD | CyberPower HID | 0x0764 | ✅ Confirmed |
+| **Eaton/MGE** | Ellipse, 3S, 5E, 5S, 5SC, 5P/5PX, 9E/9SX/9PX | Eaton HID | 0x0463 | 🔧 Model dependent |
 | **Tripp Lite** | SMART1500LCDT, UPS series | Generic HID | 0x09AE | ⚠️ Limited |
-| **Eaton/MGE** | Ellipse, Evolution series | Generic HID | 0x06DA | ⚠️ Limited |
 | **Belkin** | Older USB UPS models | Generic HID | 0x050D | ⚠️ Limited |
 
 **Beeper Control Legend:**
 - ✅ **Confirmed**: Full beeper control tested and working (enable/disable/mute/test)
+- 🔧 **Model dependent**: enable/disable/mute when the UPS exposes the control (no beeper test)
 - ⚠️ **Limited**: Basic support via generic HID (device-dependent functionality)
+
+> The Eaton HID protocol is new. It was checked against a real Eaton 9PX report descriptor and
+> NUT's parser, but not yet on every Eaton model. See [Eaton UPS Notes](#eaton-ups-notes).
 
 ### Protocol Compatibility Matrix
 
@@ -82,6 +86,7 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 |----------|---------------|----------------|---------------|----------------|
 | **APC HID** | USB HID reports | ✅ | Battery, voltage, status | ✅ Beeper control |
 | **CyberPower HID** | Vendor-specific HID | ✅ | Extended sensors, config | ✅ Beeper control |
+| **Eaton HID** | HID-PDC, paths from report descriptor | ✅ | Battery, voltages, status, ratings, timers | ✅ Beeper, battery test |
 | **Generic HID** | Standard HID-PDC | ✅ | Basic monitoring | ⚠️ Limited writes |
 
 ## Configuration Reference
@@ -102,7 +107,7 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 ups_hid:
   id: ups_monitor                # Required component ID
   update_interval: 30s           # Polling interval (5s-60s)
-  protocol: auto                 # Protocol: auto, apc, cyberpower, generic
+  protocol: auto                 # Protocol: auto, apc, cyberpower, eaton, generic
   simulation_mode: false         # Testing without UPS hardware
 ```
 
@@ -131,6 +136,7 @@ ups_hid:
   protocol: auto                 # Default: automatic selection based on USB vendor ID
   # protocol: apc                # Force APC HID protocol
   # protocol: cyberpower         # Force CyberPower HID protocol  
+  # protocol: eaton              # Force Eaton HID protocol
   # protocol: generic            # Force Generic HID protocol
 ```
 
@@ -139,6 +145,7 @@ ups_hid:
 - **`auto`** (default): Automatically select protocol based on USB vendor ID
   - APC devices (0x051D): Uses APC HID Protocol
   - CyberPower (0x0764): Uses CyberPower HID Protocol
+  - Eaton (0x0463): Uses Eaton HID Protocol
   - Unknown devices: Falls back to Generic HID Protocol
 
 - **`apc`**: Force APC HID Protocol
@@ -151,6 +158,11 @@ ups_hid:
   - Enhanced sensor support with 12+ additional sensors
   - Runtime scaling and advanced thresholds
 
+- **`eaton`**: Force Eaton HID Protocol
+  - Use for Eaton and MGE devices: Ellipse, 3S, 5E, 5S, 5SC, 5P/5PX, 9E/9SX/9PX
+  - Finds values through the UPS's HID report descriptor, so it adapts to each model
+  - Also worth trying for Eaton OEM units (Dell, HP, IBM) that report a different vendor ID
+
 - **`generic`**: Force Generic HID Protocol
   - Universal fallback for unknown UPS brands
   - Basic 5-sensor support with intelligent detection
@@ -161,6 +173,29 @@ ups_hid:
 - Troubleshooting protocol detection issues
 - Using non-standard USB vendor/product IDs
 - Forcing generic protocol for maximum compatibility
+
+### Eaton UPS Notes
+
+Eaton models place the same data in different HID reports. The Eaton protocol reads the
+UPS's HID report descriptor at startup and looks each value up by its usage path, using
+the paths and model quirks of NUT's `mge-hid` driver. A model works without code changes
+as long as it uses these paths.
+
+- **Missing sensors are normal.** Offline models (Ellipse, 3S, Protection Station) do not
+  measure input or output voltage. While on utility power, `input_voltage` shows the UPS's
+  nominal voltage, because the component derives online status from it.
+- **Beeper and battery test** buttons work when the model exposes those controls; otherwise
+  the log says the action is not supported. Beeper test and UPS (panel) test are not available.
+- **Delay settings (`number` entities) are not supported.** Eaton UPSes have no stored
+  shutdown/start delay over USB: writing `UPS.PowerSummary.DelayBeforeShutdown` starts a real
+  countdown that switches the load off. The `ups_timer_*` sensors show running countdowns.
+- **Firmware 2.02 units** (e.g. 9PX, 9SX) have a reduced and a full report descriptor; the
+  full one is used, as in NUT.
+
+To check what your UPS provides, set `ups_hid.eaton: DEBUG`. At detection, the log lists which
+HID path feeds each value. For a full listing of every path (same format as NUT
+`usbhid-ups -DD`), set the logger level to `VERBOSE`. Please include that log when reporting
+a problem with an Eaton model.
 
 ### Performance Tuning
 

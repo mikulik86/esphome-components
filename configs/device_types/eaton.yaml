@@ -1,0 +1,72 @@
+# Eaton UPS Configuration
+# For Eaton / MGE USB UPSes (VID: 0x0463): Ellipse, Ellipse ECO/PRO/MAX, Protection Station,
+# 3S, 5E, 5S, 5SC, 5P/5PX, 9E/9SX/9PX
+# Use with: packages: !include configs/device_types/eaton.yaml
+#
+# The Eaton protocol reads the UPS's HID report descriptor, so report IDs do not
+# need to be configured per model. Sensors the model does not report stay empty.
+
+substitutions:
+  # Device-specific overrides
+  device_description: "Eaton UPS Monitor"
+  log_level: "DEBUG"
+
+  # Eaton-specific settings
+  update_interval: "10s"
+  protocol_timeout: "15s"
+
+# Override UPS component with Eaton-specific settings
+ups_hid:
+  id: ups_monitor
+  update_interval: ${update_interval}
+  protocol_timeout: ${protocol_timeout}
+  protocol: eaton
+  simulation_mode: ${simulation_mode}
+  # Uncomment if auto-detection fails:
+  # usb_vendor_id: 0x0463
+  # usb_product_id: 0xFFFF
+
+# Enhanced logging for Eaton protocol debugging
+# DEBUG shows which HID path feeds each value. With logger level VERBOSE,
+# ups_hid.eaton also lists every path in the report descriptor, in the same
+# format as NUT "usbhid-ups -DD" output.
+logger:
+  level: ${log_level}
+  logs:
+    ups_hid: DEBUG
+    ups_hid.eaton: DEBUG
+
+# Eaton power calculation from the UPS's own nominal active power
+# (UPS.Flow.[4].ConfigActivePower, reported by most Eaton models)
+sensor:
+  - platform: template
+    name: "UPS Load Power (Eaton)"
+    id: ups_load_power_eaton
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: |-
+      if (!std::isnan(id(load_percentage).state) && !std::isnan(id(ups_realpower_nominal).state)) {
+        return (id(ups_realpower_nominal).state * id(load_percentage).state) / 100.0;
+      }
+      return NAN;
+    update_interval: 30s
+
+# Eaton device monitoring
+script:
+  - id: eaton_status_check
+    then:
+      - logger.log:
+          format: "Eaton Status: Battery=%.1f%%, Load=%.0fW, Runtime=%.1fmin, Status=%s"
+          args:
+            - "id(battery_level).state"
+            - "id(ups_load_power_eaton).state"
+            - "id(runtime_remaining).state"
+            - "id(ups_status_text).state.c_str()"
+          level: INFO
+
+interval:
+  - interval: 60s
+    then:
+      - script.execute: eaton_status_check

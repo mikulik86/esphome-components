@@ -42,6 +42,16 @@ public:
     virtual esp_err_t get_string_descriptor(uint8_t string_index, 
                                           std::string& result) = 0;
     
+    // HID report descriptor of the claimed interface. descriptor_index > 0 selects an
+    // alternate descriptor on devices that expose more than one (Eaton firmware 2.02).
+    virtual esp_err_t get_hid_report_descriptor(uint8_t /*descriptor_index*/,
+                                              std::vector<uint8_t>& /*descriptor*/) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
+    // Device release number (bcdDevice), 0 if unknown
+    virtual uint16_t get_device_release() const { return 0; }
+    
     // Error information
     virtual std::string get_last_error() const = 0;
 };

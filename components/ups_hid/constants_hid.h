@@ -20,8 +20,13 @@
 #define USB_CLASS_HID                   0x03
 
 #define HID_REPORT_TYPE_INPUT           0x01
-#define HID_REPORT_TYPE_OUTPUT          0x02  
+#define HID_REPORT_TYPE_OUTPUT          0x02
 #define HID_REPORT_TYPE_FEATURE         0x03
+
+// HID class descriptor types (GET_DESCRIPTOR wValue high byte)
+#define HID_DESCRIPTOR_TYPE_HID         0x21
+#define HID_DESCRIPTOR_TYPE_REPORT      0x22
+#define HID_CLASS_DESCRIPTOR_LENGTH     9     // HID descriptor with one class descriptor entry
 
 // =============================================================================
 // HID Usage Pages (USB HID Usage Tables v1.12)
@@ -43,8 +48,11 @@
 // Power Components
 #define HID_USAGE_POW_BATTERY_SYSTEM            0x0010
 #define HID_USAGE_POW_BATTERY                   0x0012
+#define HID_USAGE_POW_CHARGER                   0x0014
+#define HID_USAGE_POW_POWER_CONVERTER           0x0016
 #define HID_USAGE_POW_INPUT                     0x001A
 #define HID_USAGE_POW_OUTPUT                    0x001C
+#define HID_USAGE_POW_FLOW                      0x001E
 #define HID_USAGE_POW_POWER_SUMMARY             0x0024
 
 // Measurements
@@ -80,10 +88,15 @@
 #define HID_USAGE_POW_GOOD                      0x0061
 #define HID_USAGE_POW_INTERNAL_FAILURE          0x0062
 #define HID_USAGE_POW_VOLTAGE_OUT_OF_RANGE      0x0063
+#define HID_USAGE_POW_FREQUENCY_OUT_OF_RANGE    0x0064
 #define HID_USAGE_POW_OVERLOAD                  0x0065
 #define HID_USAGE_POW_OVER_CHARGED              0x0066
+#define HID_USAGE_POW_OVER_TEMPERATURE          0x0067
 #define HID_USAGE_POW_SHUTDOWN_REQUESTED        0x0068
 #define HID_USAGE_POW_SHUTDOWN_IMMINENT         0x0069
+#define HID_USAGE_POW_USED                      0x006D
+#define HID_USAGE_POW_BOOST                     0x006E
+#define HID_USAGE_POW_BUCK                      0x006F
 
 // Device Information
 #define HID_USAGE_POW_I_MANUFACTURER            0x00FD
@@ -94,7 +107,12 @@
 // Battery System Usage IDs (HID Power Device Class v1.1)
 // =============================================================================
 
+// Battery Limits
+#define HID_USAGE_BAT_REMAINING_CAPACITY_LIMIT  0x0029
+#define HID_USAGE_BAT_REMAINING_TIME_LIMIT      0x002A
+
 // Battery Status
+#define HID_USAGE_BAT_BELOW_REMAINING_CAPACITY_LIMIT 0x0042
 #define HID_USAGE_BAT_CHARGING                  0x0044
 #define HID_USAGE_BAT_DISCHARGING               0x0045
 #define HID_USAGE_BAT_FULLY_CHARGED             0x0046
@@ -115,6 +133,10 @@
 #define HID_USAGE_BAT_I_MANUFACTURER_NAME       0x0087
 #define HID_USAGE_BAT_I_DEVICE_NAME             0x0088
 #define HID_USAGE_BAT_I_DEVICE_CHEMISTRY        0x0089
+
+// Battery Presence
+#define HID_USAGE_BAT_AC_PRESENT                0x00D0
+#define HID_USAGE_BAT_BATTERY_PRESENT           0x00D1
 
 // =============================================================================
 // Regional Voltage Standards (IEC 60038)
