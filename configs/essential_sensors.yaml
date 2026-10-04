@@ -103,4 +103,4 @@ binary_sensor:
     name: "Overload Warning"
     id: overload_warning
     type: overload
-    device_class: power
+    device_class: problem
