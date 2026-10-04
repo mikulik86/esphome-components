@@ -117,6 +117,6 @@ script:
       - logger.log:
           format: "Power Status: Online=%d, Battery=%d%%, Runtime=%d min"
           args: 
-            - 'id(ups_online).state'
+            - 'id(ups_monitor).is_online()'
             - 'int(id(battery_level).state)'
             - 'int(id(runtime_remaining).state)'
