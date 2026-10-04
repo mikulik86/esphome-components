@@ -30,12 +30,9 @@ packages:
   # cyberpower_device: !include ../device_types/cyberpower_cp1500.yaml
 
 # Benefits of this configuration:
-# 
-# Web Interface Organization:
+#
+# Web Interface Organization (entities from the packages above):
 # ├── ⚡ Power Status (sorting_weight: 10)
-# │   ├── UPS Online
-# │   ├── On Battery Power
-# │   ├── Low Battery Warning
 # │   └── Overload Warning
 # │
 # ├── 🔋 Battery Monitoring (sorting_weight: 20)
@@ -43,58 +40,68 @@ packages:
 # │   ├── Runtime Remaining
 # │   ├── Battery Charging
 # │   ├── Battery Voltage
+# │   ├── Battery Voltage Nominal
+# │   ├── Battery Runtime Low Threshold
 # │   └── Battery Status
 # │
 # ├── ⚡ Voltage & Frequency (sorting_weight: 30)
 # │   ├── Input Voltage
 # │   ├── Output Voltage
-# │   ├── Input Frequency
-# │   └── Transfer Thresholds
+# │   ├── Input Voltage Nominal
+# │   ├── Input Transfer Low
+# │   ├── Input Transfer High
+# │   └── Input Frequency
 # │
 # ├── 📊 Load & Power (sorting_weight: 40)
 # │   ├── Load Percentage
-# │   ├── UPS Load Power
-# │   └── Real Power Nominal
+# │   ├── UPS Real Power Nominal
+# │   └── UPS Load Power
 # │
 # ├── ⏱️ Active Timers (sorting_weight: 50)
-# │   ├── Timer Shutdown
-# │   ├── Timer Start
-# │   ├── Timer Reboot
-# │   └── Active Timer Count
+# │   ├── UPS Timer Shutdown
+# │   ├── UPS Timer Start
+# │   ├── UPS Timer Reboot
+# │   ├── Active Timer Count
+# │   └── Fast Polling Status
 # │
 # ├── ⚙️ Configuration (sorting_weight: 60)
-# │   ├── Delay Shutdown
-# │   ├── Delay Start
-# │   ├── Delay Reboot
-# │   ├── Beeper Status
+# │   ├── UPS Delay Shutdown
+# │   ├── UPS Delay Start
+# │   ├── UPS Delay Reboot
+# │   ├── UPS Beeper Status
 # │   └── Input Sensitivity
 # │
 # ├── 🔔 Beeper Controls (sorting_weight: 70)
-# │   ├── Enable
-# │   ├── Disable
-# │   ├── Mute
-# │   └── Test
+# │   ├── UPS Beeper Enable
+# │   ├── UPS Beeper Disable
+# │   ├── UPS Beeper Mute
+# │   └── UPS Beeper Test
 # │
 # ├── 🧪 Test Controls (sorting_weight: 80)
-# │   ├── Quick Battery Test
-# │   ├── Deep Battery Test
-# │   ├── Stop Battery Test
-# │   ├── Panel Test
-# │   ├── Stop Panel Test
-# │   └── Test Result
+# │   ├── UPS Quick Battery Test
+# │   ├── UPS Deep Battery Test
+# │   ├── UPS Stop Battery Test
+# │   ├── UPS Panel Test
+# │   ├── UPS Stop Panel Test
+# │   └── UPS Test Result
 # │
 # ├── ℹ️ Device Information (sorting_weight: 90)
-# │   ├── Manufacturer
-# │   ├── Model
-# │   ├── Serial Number
-# │   ├── Firmware Version
-# │   └── Manufacture Date
+# │   ├── UPS Manufacturer
+# │   ├── UPS Model
+# │   ├── UPS Serial Number
+# │   ├── UPS Firmware Version
+# │   ├── UPS Manufacture Date
+# │   └── Firmware Auxiliary
 # │
 # └── 📡 System Status (sorting_weight: 100)
 #     ├── Uptime
 #     ├── WiFi Signal
 #     ├── IP Address
 #     └── ESPHome Version
+#
+# UPS Status and Detected Protocol (from base_ups.yaml) have no group. The online,
+# on_battery and low_battery binary sensors are not in these packages; add them with
+# web_server: sorting_group_id: ups_power_status to show them under Power Status.
 
 # Home Assistant Benefits:
 # - Entities appear in logical groups in device view
