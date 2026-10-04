@@ -3,6 +3,7 @@
 #include "constants_ups.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
+#include <cinttypes>
 #include <cstring>
 #include <regex>
 #include <algorithm>
@@ -82,23 +83,6 @@ static const uint8_t APC_PRESENT_SHUTDOWN_IMMINENT = 0x20; // Bit 5: Shutdown im
 static const uint8_t APC_PRESENT_TIME_LIMIT_EXPIRED = 0x40; // Bit 6: Time limit expired
 static const uint8_t APC_PRESENT_NEED_REPLACEMENT = 0x80;   // Bit 7: Need replacement
 static const uint8_t APC_PRESENT_OVERLOAD = 0x01;          // Bit 0 of second byte: Overload
-
-// APC-specific date conversion (hex-as-decimal format)
-static std::string convert_apc_date(uint32_t apc_date) {
-  if (apc_date == 0) return status::UNKNOWN;
-  
-  // APC uses hex-as-decimal format, e.g., 0x102202 = 10/22/02
-  uint8_t month = (apc_date >> 16) & 0xFF;
-  uint8_t day = (apc_date >> 8) & 0xFF;
-  uint8_t year = apc_date & 0xFF;
-  
-  // Convert 2-digit year to 4-digit (Y2K handling)
-  uint16_t full_year = (year <= 69) ? (2000 + year) : (1900 + year);
-  
-  char date_str[16];
-  snprintf(date_str, sizeof(date_str), "%02d/%02d/%04d", month, day, full_year);
-  return std::string(date_str);
-}
 
 // APC HID Protocol implementation
 ApcHidProtocol::ApcHidProtocol(UpsHidComponent *parent) : UpsProtocolBase(parent) {}
@@ -651,7 +635,7 @@ void ApcReportParser::parse_battery_report(const HidReport &report, UpsData &dat
     if (runtime_raw > 0 && runtime_raw < 65535) { // Sanity check
       // Convert seconds to minutes to match ESPHome sensor expectations
       data.battery.runtime_minutes = static_cast<float>(runtime_raw) / 60.0f;
-      ESP_LOGI(APC_HID_TAG, "Runtime: %d seconds (%.1f minutes)", runtime_raw, data.battery.runtime_minutes);
+      ESP_LOGI(APC_HID_TAG, "Runtime: %" PRIu32 " seconds (%.1f minutes)", runtime_raw, data.battery.runtime_minutes);
     } else {
       // Set estimate based on battery level if raw value seems invalid
       data.battery.runtime_minutes = data.battery.level * 0.5f; 
@@ -822,41 +806,7 @@ void ApcHidProtocol::parse_voltage_report(const HidReport &report, UpsData &data
 }
 
 void ApcHidProtocol::parse_power_report(const HidReport &report, UpsData &data) {
-  if (report.data.size() < 3) {
-    ESP_LOGW(APC_HID_TAG, "Power report too short: %zu bytes", report.data.size());
-    return;
-  }
-  
-  // Parse load - handle different report sizes
-  // report.data[0] = report ID (APC_REPORT_ID_LOAD)
-  
-  if (report.data.size() >= 7) {
-    // Working ESP32 NUT server format: recv[6] = UPS load percentage
-    data.power.load_percent = static_cast<float>(report.data[6]);
-    ESP_LOGI(APC_HID_TAG, "Load: %.0f%% (from byte 6)", data.power.load_percent);
-  } else {
-    // Shorter format - try different bytes to find load percentage
-    // Current data: 07 39 4B (57, 75 in decimal)
-    
-    // Method 1: Try byte 1 (0x39 = 57%)
-    uint8_t load_candidate1 = report.data[1];
-    // Method 2: Try byte 2 (0x4B = 75%)
-    uint8_t load_candidate2 = report.data[2];
-    
-    ESP_LOGI(APC_HID_TAG, "Load candidates - Byte1: %d%%, Byte2: %d%%", 
-             load_candidate1, load_candidate2);
-    
-    // Use the first reasonable value (prefer byte 1 based on previous analysis)
-    if (load_candidate1 <= 100) {
-      data.power.load_percent = static_cast<float>(load_candidate1);
-      ESP_LOGI(APC_HID_TAG, "Load: %.0f%% (from byte 1)", data.power.load_percent);
-    } else if (load_candidate2 <= 100) {
-      data.power.load_percent = static_cast<float>(load_candidate2);
-      ESP_LOGI(APC_HID_TAG, "Load: %.0f%% (from byte 2)", data.power.load_percent);
-    } else {
-      ESP_LOGW(APC_HID_TAG, "No valid load percentage found");
-    }
-  }
+  ApcReportParser::parse_power_report(report, data);
 }
 
 void ApcHidProtocol::read_device_info() {

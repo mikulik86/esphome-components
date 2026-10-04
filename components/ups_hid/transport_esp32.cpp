@@ -15,9 +15,9 @@ static const char *const ESP32_USB_TAG = "ups_hid.esp32_usb";
 #define USB_CLASS_HID 0x03
 #endif
 
-Esp32UsbTransport::Esp32UsbTransport() {
-    memset(&device_, 0, sizeof(device_));
-}
+// device_ is fully initialized by the default member initializers in UsbDevice
+// (all zero / nullptr, speed = USB_SPEED_LOW), so no memset is needed.
+Esp32UsbTransport::Esp32UsbTransport() = default;
 
 Esp32UsbTransport::~Esp32UsbTransport() {
     deinitialize();

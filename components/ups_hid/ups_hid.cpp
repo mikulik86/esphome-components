@@ -12,6 +12,7 @@
 #include "protocol_generic.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
+#include <cinttypes>
 #include <functional>
 #include <cmath>
 
@@ -85,9 +86,9 @@ void UpsHidComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "  USB Product ID: 0x%04X", transport_->get_product_id());
   }
   
-  ESP_LOGCONFIG(TAG, "  Protocol Timeout: %u ms", protocol_timeout_ms_);
+  ESP_LOGCONFIG(TAG, "  Protocol Timeout: %" PRIu32 " ms", protocol_timeout_ms_);
   ESP_LOGCONFIG(TAG, "  Protocol Selection: %s", protocol_selection_.c_str());
-  ESP_LOGCONFIG(TAG, "  Update Interval: %u ms", get_update_interval());
+  ESP_LOGCONFIG(TAG, "  Update Interval: %" PRIu32 " ms", get_update_interval());
 
   if (transport_ && transport_->is_connected()) {
     ESP_LOGCONFIG(TAG, "  Status: %s", status::CONNECTED);
@@ -586,7 +587,7 @@ bool UpsHidComponent::should_log_error(ErrorRateLimit& limiter) {
 
 void UpsHidComponent::log_suppressed_errors(ErrorRateLimit& limiter) {
   if (limiter.suppressed_count > 0) {
-    ESP_LOGW(TAG, "Suppressed %u similar errors in the last %u ms", 
+    ESP_LOGW(TAG, "Suppressed %" PRIu32 " similar errors in the last %" PRIu32 " ms",
              limiter.suppressed_count, ErrorRateLimit::RATE_LIMIT_MS);
     limiter.suppressed_count = 0;
   }
