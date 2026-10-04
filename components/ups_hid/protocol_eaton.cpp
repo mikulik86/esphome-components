@@ -347,6 +347,7 @@ bool EatonHidProtocol::initialize() {
   ESP_LOGI(EATON_TAG, "Eaton HID protocol initialized: %s %s (serial: %s, firmware: %s)", manufacturer_.c_str(),
            model_.empty() ? "UPS" : model_.c_str(), serial_number_.empty() ? "unknown" : serial_number_.c_str(),
            firmware_version_.empty() ? "unknown" : firmware_version_.c_str());
+  log_data_points();  // after read_device_info(): what is used depends on the model
   return true;
 }
 
@@ -382,23 +383,40 @@ bool EatonHidProtocol::load_report_descriptor() {
              field_count);
   }
 
-  size_t mapped = 0;
+  ESP_LOGI(EATON_TAG, "HID report descriptor: %zu bytes, %zu fields", raw.size(), field_count);
+  descriptor_loaded_ = field_count > 0;
+  return descriptor_loaded_;
+}
+
+bool EatonHidProtocol::used_on_this_model(Item item) const {
+  // UPS.PowerSummary.Voltage / ConfigVoltage only hold the battery voltage on some series
+  if (item == ITEM_SUMMARY_VOLTAGE || item == ITEM_SUMMARY_VOLTAGE_NOMINAL) {
+    return summary_voltage_is_battery_;
+  }
+  return true;
+}
+
+void EatonHidProtocol::log_data_points() const {
+  size_t found = 0;
+  size_t unused = 0;
   for (size_t rank = 0; rank < PATH_COUNT; rank++) {
     const PathDefinition &definition = EATON_PATHS[rank];
     if (field_rank_[definition.item] != rank) {
       continue;
     }
     const HidField &field = fields_[definition.item];
-    mapped++;
-    ESP_LOGD(EATON_TAG, "  %-28s <- %s (%s report 0x%02X, bit %u, %u bits)", definition.name,
+    const bool used = used_on_this_model(definition.item);
+    found++;
+    if (!used) {
+      unused++;
+    }
+    ESP_LOGD(EATON_TAG, "  %-28s <- %s (%s report 0x%02X, bit %u, %u bits)%s", definition.name,
              HidReportDescriptor::path_to_string(field).c_str(), report_type_name(field.report_type), field.report_id,
-             field.bit_offset, field.bit_size);
+             field.bit_offset, field.bit_size, used ? "" : " - not used on this model");
   }
 
-  ESP_LOGI(EATON_TAG, "HID report descriptor: %zu bytes, %zu fields, %zu of %u Eaton data points found", raw.size(),
-           field_count, mapped, static_cast<unsigned>(ITEM_COUNT));
-  descriptor_loaded_ = field_count > 0;
-  return descriptor_loaded_;
+  ESP_LOGI(EATON_TAG, "%zu of %u Eaton data points found, %zu not used on this model", found,
+           static_cast<unsigned>(ITEM_COUNT), unused);
 }
 
 void EatonHidProtocol::map_field(const HidField &field) {

@@ -140,6 +140,8 @@ class EatonHidProtocol : public UpsProtocolBase {
   bool load_report_descriptor();
   void map_field(const HidField &field);
   bool has(Item item) const { return field_rank_[item] != NO_FIELD; }
+  bool used_on_this_model(Item item) const;
+  void log_data_points() const;
 
   bool read_raw(Item item, int64_t &value);
   bool read_value(Item item, float &value);
