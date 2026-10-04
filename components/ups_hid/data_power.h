@@ -26,7 +26,9 @@ struct PowerData {
   
   // Power status information
   std::string status{};                // Power status text (Online, On Battery, etc.)
-  
+  bool overload_reported{false};       // The protocol read the UPS's own overload flag
+  bool overload{false};                // That flag, valid when overload_reported is set
+
   // Power quality indicators
   bool input_voltage_valid() const {
     return !std::isnan(input_voltage) && input_voltage > 50.0f && input_voltage < 300.0f;
@@ -47,6 +49,8 @@ struct PowerData {
   }
   
   bool is_overloaded() const {
+    // Trust the UPS when it reports overload itself, otherwise estimate from the load
+    if (overload_reported) return overload;
     return !std::isnan(load_percent) && load_percent > 95.0f;
   }
   

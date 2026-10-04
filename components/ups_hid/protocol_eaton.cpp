@@ -718,7 +718,8 @@ bool EatonHidProtocol::read_status(UpsData &data) {
   bool internal_failure = false, over_temperature = false, fan_failure = false;
   read_flag(ITEM_BOOST, boost);
   read_flag(ITEM_BUCK, buck);
-  read_flag(ITEM_OVERLOAD, overload);
+  data.power.overload_reported = read_flag(ITEM_OVERLOAD, overload);
+  data.power.overload = overload;
   read_flag(ITEM_INTERNAL_FAILURE, internal_failure);
   read_flag(ITEM_OVER_TEMPERATURE, over_temperature);
   read_flag(ITEM_FAN_FAILURE, fan_failure);
