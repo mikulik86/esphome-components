@@ -533,12 +533,10 @@ esp_err_t Esp32UsbTransport::find_endpoints() {
         return ESP_ERR_NOT_FOUND;
     }
 
-    // Detect input-only devices (no OUT endpoint)
+    // An interrupt OUT endpoint is optional for HID. GET_REPORT and SET_REPORT both go
+    // over the control endpoint, so its absence doesn't rule out sending commands.
     if (device_.ep_out == 0) {
-        ESP_LOGW(ESP32_USB_TAG, "INPUT-ONLY HID device detected - no OUT endpoint available");
-        ESP_LOGI(ESP32_USB_TAG, "Device supports HID GET_REPORT only (no SET_REPORT)");
-    } else {
-        ESP_LOGD(ESP32_USB_TAG, "Bidirectional device detected - has both IN and OUT endpoints");
+        ESP_LOGD(ESP32_USB_TAG, "No interrupt OUT endpoint - HID reports use the control endpoint");
     }
     
     return ESP_OK;
