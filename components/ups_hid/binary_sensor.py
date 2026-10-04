@@ -3,7 +3,6 @@ import esphome.config_validation as cv
 from esphome.components import binary_sensor
 from esphome.const import (
     CONF_TYPE,
-    DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_BATTERY,
     DEVICE_CLASS_BATTERY_CHARGING,
     DEVICE_CLASS_PROBLEM,
@@ -20,10 +19,10 @@ UpsHidBinarySensor = ups_hid_ns.class_(
 
 BINARY_SENSOR_TYPES = {
     "online": {
-        "device_class": DEVICE_CLASS_CONNECTIVITY,
+        "device_class": DEVICE_CLASS_POWER,
     },
     "on_battery": {
-        "device_class": DEVICE_CLASS_BATTERY,
+        "device_class": DEVICE_CLASS_PROBLEM,
     },
     "low_battery": {
         "device_class": DEVICE_CLASS_BATTERY,
