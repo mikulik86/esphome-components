@@ -87,46 +87,61 @@ private:
 };
 
 /**
- * Protocol Registration Helper Macros
- * 
- * These macros enable automatic protocol registration at startup
+ * Protocol Registration
+ *
+ * The REGISTER_* macros below define a registration function
+ * esphome::ups_hid::register_<protocol_name>(), which
+ * ProtocolFactory::ensure_initialized() calls explicitly on first use of the factory.
+ *
+ * Why not static self-registration: ESPHome builds this component into a static
+ * library, and the linker only pulls an object file out of that library if another
+ * linked object references one of its symbols. A protocol .cpp whose only entry
+ * point is a static registrar object is never referenced, so the linker dropped it
+ * and the protocol silently never registered (symptom: "No protocol found with name
+ * containing ..." / "No suitable protocol found for vendor ..."). Calling the
+ * register functions from the factory creates a hard reference to every protocol
+ * object file, so all of them are always linked.
+ *
+ * To add a protocol: use one of the macros at the end of its .cpp (global scope),
+ * declare register_<protocol_name>() in the list below, and call it from
+ * ProtocolFactory::ensure_initialized() in protocol_factory.cpp.
  */
 
-// Forward declare for registration macros
-class ProtocolFactory;
+// Built-in protocols (defined by the macro invocations in protocol_*.cpp)
+void register_apc_hid_protocol();
+void register_cyberpower_hid_protocol();
+void register_generic_hid_protocol();
 
-// Register protocol for specific vendor
+// Define the registration function for a vendor-specific protocol
 #define REGISTER_UPS_PROTOCOL_FOR_VENDOR(vendor_id, protocol_name, creator_func, name_str, desc_str, prio) \
-    namespace { \
-        struct protocol_name##_registrar { \
-            protocol_name##_registrar() { \
-                esphome::ups_hid::ProtocolFactory::ProtocolInfo info; \
-                info.creator = creator_func; \
-                info.name = name_str; \
-                info.description = desc_str; \
-                info.supported_vendors = {vendor_id}; \
-                info.priority = prio; \
-                esphome::ups_hid::ProtocolFactory::register_protocol_for_vendor(vendor_id, info); \
-            } \
-        }; \
-        static protocol_name##_registrar protocol_name##_reg; \
+    namespace esphome { \
+    namespace ups_hid { \
+    void register_##protocol_name() { \
+        ProtocolFactory::ProtocolInfo info; \
+        info.creator = creator_func; \
+        info.name = name_str; \
+        info.description = desc_str; \
+        info.supported_vendors = {vendor_id}; \
+        info.priority = prio; \
+        ProtocolFactory::register_protocol_for_vendor(vendor_id, info); \
+    } \
+    } \
     }
 
-// Register fallback protocol
+// Define the registration function for a fallback protocol
 #define REGISTER_UPS_FALLBACK_PROTOCOL(protocol_name, creator_func, name_str, desc_str, prio) \
-    namespace { \
-        struct protocol_name##_fallback_registrar { \
-            protocol_name##_fallback_registrar() { \
-                esphome::ups_hid::ProtocolFactory::ProtocolInfo info; \
-                info.creator = creator_func; \
-                info.name = name_str; \
-                info.description = desc_str; \
-                info.supported_vendors = {}; \
-                info.priority = prio; \
-                esphome::ups_hid::ProtocolFactory::register_fallback_protocol(info); \
-            } \
-        }; \
-        static protocol_name##_fallback_registrar protocol_name##_fallback_reg; \
+    namespace esphome { \
+    namespace ups_hid { \
+    void register_##protocol_name() { \
+        ProtocolFactory::ProtocolInfo info; \
+        info.creator = creator_func; \
+        info.name = name_str; \
+        info.description = desc_str; \
+        info.supported_vendors = {}; \
+        info.priority = prio; \
+        ProtocolFactory::register_fallback_protocol(info); \
+    } \
+    } \
     }
 
 } // namespace ups_hid

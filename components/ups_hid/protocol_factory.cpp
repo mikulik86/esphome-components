@@ -22,13 +22,23 @@ ProtocolFactory::get_fallback_registry() {
 }
 
 void ProtocolFactory::ensure_initialized() {
-    // Registries are initialized on first access due to static storage
-    // This function exists for explicit initialization if needed
+    // Register all built-in protocols once, on first use of the factory.
+    // Explicit calls (instead of static self-registration) guarantee the linker
+    // keeps every protocol object file - see protocol_factory.h for details.
     static bool initialized = false;
-    if (!initialized) {
-        ESP_LOGD(FACTORY_TAG, "Protocol factory registries initialized");
-        initialized = true;
+    if (initialized) {
+        return;
     }
+    // Set before registering: the register_* functions call back into
+    // ensure_initialized() via register_protocol_for_vendor()/register_fallback_protocol().
+    initialized = true;
+
+    register_apc_hid_protocol();
+    register_cyberpower_hid_protocol();
+    register_generic_hid_protocol();
+
+    ESP_LOGD(FACTORY_TAG, "Protocol factory initialized: %zu vendor(s), %zu fallback protocol(s)",
+             get_vendor_registry().size(), get_fallback_registry().size());
 }
 
 void ProtocolFactory::register_protocol_for_vendor(uint16_t vendor_id, 
