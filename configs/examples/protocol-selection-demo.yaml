@@ -36,10 +36,6 @@ ups_hid:
   # protocol: cyberpower      # Force CyberPower HID Protocol  
   # protocol: generic         # Force Generic HID Protocol
 
-# Platform stubs for compilation
-button:
-binary_sensor:
-
 # Enhanced logging to see protocol selection
 logger:
   level: DEBUG

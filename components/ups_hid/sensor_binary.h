@@ -1,5 +1,9 @@
 #pragma once
 
+#include "esphome/core/defines.h"
+
+#ifdef USE_BINARY_SENSOR
+
 #include "esphome/core/component.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "ups_hid.h"
@@ -21,3 +25,5 @@ namespace esphome
 
   } // namespace ups_hid
 } // namespace esphome
+
+#endif  // USE_BINARY_SENSOR

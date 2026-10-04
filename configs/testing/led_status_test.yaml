@@ -72,11 +72,6 @@ ups_status_led:
     start_time: ${led_night_start}
     end_time: ${led_night_end}
 
-# Enable required platforms for UPS HID component
-sensor:
-binary_sensor:
-button:
-
 # Testing features:
 #
 # LED Pattern Testing (automatic, priority-based, solid colors):

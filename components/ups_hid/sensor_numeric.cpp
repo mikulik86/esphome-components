@@ -1,4 +1,7 @@
 #include "sensor_numeric.h"
+
+#ifdef USE_SENSOR
+
 #include "esphome/core/log.h"
 
 namespace esphome
@@ -17,3 +20,5 @@ namespace esphome
 
   } // namespace ups_hid
 } // namespace esphome
+
+#endif  // USE_SENSOR

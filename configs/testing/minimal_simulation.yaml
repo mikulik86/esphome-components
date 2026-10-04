@@ -45,10 +45,6 @@ ups_hid:
   protocol: auto
   simulation_mode: true
 
-# Required platform components (fix compilation errors)
-button:
-binary_sensor:
-
 # Additional sensors for testing
 sensor:
   - platform: ups_hid

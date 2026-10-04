@@ -45,10 +45,6 @@ ups_hid:
   simulation_mode: ${simulation_mode}
   # fallback_nominal_voltage comes from regional template (230V European)
 
-# Platform stubs
-binary_sensor:
-button:
-
 # Test sensors to validate regional defaults
 sensor:
   - platform: ups_hid
