@@ -33,6 +33,9 @@ BINARY_SENSOR_TYPES = {
     "overload": {
         "device_class": DEVICE_CLASS_PROBLEM,
     },
+    "replace_battery": {
+        "device_class": DEVICE_CLASS_PROBLEM,
+    },
     "charging": {
         "device_class": DEVICE_CLASS_BATTERY_CHARGING,
     },

@@ -413,6 +413,8 @@ void UpsHidComponent::update_sensors() {
       state = ups_fault(ups_data_);
     } else if (type == binary_sensor_type::OVERLOAD) {
       state = ups_data_.power.is_overloaded();
+    } else if (type == binary_sensor_type::REPLACE_BATTERY) {
+      state = ups_data_.battery.needs_replacement;
     }
     
     sensor->publish_state(state);
@@ -767,6 +769,11 @@ bool UpsHidComponent::is_overloaded() const {
   std::lock_guard<std::mutex> lock(data_mutex_);
   // Use power's built-in overload detection
   return ups_data_.power.is_overloaded();
+}
+
+bool UpsHidComponent::needs_battery_replacement() const {
+  std::lock_guard<std::mutex> lock(data_mutex_);
+  return ups_data_.battery.needs_replacement;
 }
 
 float UpsHidComponent::get_battery_level() const {

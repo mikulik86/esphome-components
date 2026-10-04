@@ -104,6 +104,7 @@ namespace esphome
       bool is_charging() const;
       bool has_fault() const;
       bool is_overloaded() const;
+      bool needs_battery_replacement() const;
       float get_battery_level() const;
       float get_input_voltage() const;
       float get_output_voltage() const;

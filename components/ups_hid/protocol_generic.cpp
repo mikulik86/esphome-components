@@ -514,6 +514,7 @@ void GenericHidProtocol::parse_battery_status(uint8_t *data, size_t len, UpsData
 
       if (status & 0x10)
       {
+        ups_data.battery.needs_replacement = true;
         // Append replace battery suffix to existing status
         if (ups_data.battery.status.empty())
         {
@@ -591,6 +592,7 @@ void GenericHidProtocol::parse_present_status(uint8_t *data, size_t len, UpsData
 
     if (status & 0x10)
     {
+      ups_data.battery.needs_replacement = true;
       // Append replace battery suffix to existing status
       if (ups_data.battery.status.empty())
       {

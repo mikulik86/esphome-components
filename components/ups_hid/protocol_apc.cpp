@@ -523,8 +523,9 @@ void ApcReportParser::parse_present_status_report(const HidReport &report, UpsDa
   
   if (need_replacement) {
     data.battery.status += battery_status::REPLACE_BATTERY_SUFFIX;
+    data.battery.needs_replacement = true;
   }
-  
+
   if (!battery_present) {
     data.battery.status = battery_status::NOT_PRESENT;
   }
@@ -693,6 +694,7 @@ void ApcReportParser::parse_status_report(const HidReport &report, UpsData &data
   if (!good || internal_failure || need_replacement) {
     if (need_replacement) {
       data.battery.status += battery_status::REPLACE_BATTERY_SUFFIX;
+      data.battery.needs_replacement = true;
     } else if (internal_failure) {
       data.battery.status += battery_status::INTERNAL_FAILURE_SUFFIX;
     } else {

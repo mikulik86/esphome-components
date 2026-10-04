@@ -787,6 +787,7 @@ bool EatonHidProtocol::read_status(UpsData &data) {
   read_flag(ITEM_NEED_REPLACEMENT, need_replacement);
   read_flag(ITEM_BELOW_CAPACITY_LIMIT, below_capacity_limit);
   read_flag(ITEM_SHUTDOWN_IMMINENT, shutdown_imminent);
+  data.battery.needs_replacement = need_replacement;
   if (need_replacement) {
     data.battery.status += battery_status::REPLACE_BATTERY_SUFFIX;
   }

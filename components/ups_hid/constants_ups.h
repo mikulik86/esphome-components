@@ -207,6 +207,7 @@ namespace binary_sensor_type {
     static constexpr const char* LOW_BATTERY = "low_battery";
     static constexpr const char* FAULT = "fault";
     static constexpr const char* OVERLOAD = "overload";
+    static constexpr const char* REPLACE_BATTERY = "replace_battery";
     static constexpr const char* BUCK = "buck";
     static constexpr const char* BOOST = "boost";
     static constexpr const char* CHARGING = "charging";

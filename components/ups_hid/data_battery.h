@@ -22,7 +22,8 @@ struct BatteryData {
   std::string status{};                // Battery status text
   std::string type{};                  // Battery chemistry type
   std::string mfr_date{};              // Battery manufacture date
-  
+  bool needs_replacement{false};       // UPS reports the battery needs replacing
+
   // Validation and utility methods
   bool is_valid() const { 
     return !std::isnan(level) || !std::isnan(voltage) || !std::isnan(runtime_minutes);
