@@ -19,6 +19,32 @@
 namespace esphome {
 namespace ups_hid {
 
+namespace {
+
+// UPS state derived from the latest data, shared by the binary sensors and the
+// is_*() getters so entities, NUT server and status LED always agree
+
+bool ups_online(const UpsData &data) {
+  // UPS is online when input voltage is valid
+  return data.power.input_voltage_valid();
+}
+
+bool ups_charging(const UpsData &data) {
+  // Charging when online AND battery level is not 100%
+  return data.power.input_voltage_valid() &&
+         data.battery.is_valid() &&
+         !std::isnan(data.battery.level) &&
+         data.battery.level < 100.0f;
+}
+
+bool ups_fault(const UpsData &data) {
+  // Check for various fault conditions based on available data
+  return data.power.is_input_out_of_range() ||
+         (!data.power.is_valid() && !data.battery.is_valid());
+}
+
+}  // namespace
+
 void UpsHidComponent::setup() {
   ESP_LOGCONFIG(TAG, log_messages::SETTING_UP);
   
@@ -353,12 +379,18 @@ void UpsHidComponent::update_sensors() {
     
     bool state = false;
     
-    if (type == binary_sensor_type::ONLINE && ups_data_.power.input_voltage_valid()) {
-      state = true;
-    } else if (type == binary_sensor_type::ON_BATTERY && ups_data_.power.input_voltage_valid()) {
-      state = false; // Opposite of online
+    if (type == binary_sensor_type::ONLINE) {
+      state = ups_online(ups_data_);
+    } else if (type == binary_sensor_type::ON_BATTERY) {
+      state = !ups_online(ups_data_);
     } else if (type == binary_sensor_type::LOW_BATTERY) {
       state = ups_data_.battery.is_low();
+    } else if (type == binary_sensor_type::CHARGING) {
+      state = ups_charging(ups_data_);
+    } else if (type == binary_sensor_type::FAULT) {
+      state = ups_fault(ups_data_);
+    } else if (type == binary_sensor_type::OVERLOAD) {
+      state = ups_data_.power.is_overloaded();
     }
     
     sensor->publish_state(state);
@@ -684,14 +716,13 @@ void UpsHidComponent::set_fast_polling_mode(bool enable) {
 // Convenient state getters for lambda expressions (no sensor entities required)
 bool UpsHidComponent::is_online() const {
   std::lock_guard<std::mutex> lock(data_mutex_);
-  // UPS is online when input voltage is valid (same logic as binary sensor update)
-  return ups_data_.power.input_voltage_valid();
+  return ups_online(ups_data_);
 }
 
 bool UpsHidComponent::is_on_battery() const {
   std::lock_guard<std::mutex> lock(data_mutex_);
   // UPS is on battery when NOT online (opposite of online state)
-  return !ups_data_.power.input_voltage_valid();
+  return !ups_online(ups_data_);
 }
 
 bool UpsHidComponent::is_low_battery() const {
@@ -702,18 +733,12 @@ bool UpsHidComponent::is_low_battery() const {
 
 bool UpsHidComponent::is_charging() const {
   std::lock_guard<std::mutex> lock(data_mutex_);
-  // Charging when online AND battery level is not 100%
-  return ups_data_.power.input_voltage_valid() && 
-         ups_data_.battery.is_valid() && 
-         !std::isnan(ups_data_.battery.level) && 
-         ups_data_.battery.level < 100.0f;
+  return ups_charging(ups_data_);
 }
 
 bool UpsHidComponent::has_fault() const {
   std::lock_guard<std::mutex> lock(data_mutex_);
-  // Check for various fault conditions based on available data
-  return ups_data_.power.is_input_out_of_range() || 
-         (!ups_data_.power.is_valid() && !ups_data_.battery.is_valid());
+  return ups_fault(ups_data_);
 }
 
 bool UpsHidComponent::is_overloaded() const {
