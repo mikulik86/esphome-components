@@ -23,7 +23,6 @@ namespace timing {
     
     // USB operation timeouts
     static constexpr uint32_t USB_CONTROL_TRANSFER_TIMEOUT_MS = 1000;  // 1 second
-    static constexpr uint32_t USB_SEMAPHORE_TIMEOUT_MS = 1000;         // 1 second  
     static constexpr uint32_t USB_CLIENT_EVENT_TIMEOUT_MS = 100;       // 100ms for event polling
     static constexpr uint32_t HID_REPORT_DESCRIPTOR_TIMEOUT_MS = 3000; // descriptors can be several KB
 }
