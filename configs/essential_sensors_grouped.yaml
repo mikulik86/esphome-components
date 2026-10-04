@@ -137,7 +137,7 @@ binary_sensor:
     name: "Battery Charging"
     id: battery_charging
     type: charging
-    device_class: battery
+    device_class: battery_charging
     web_server:
       sorting_group_id: ups_battery_monitoring
       sorting_weight: 30

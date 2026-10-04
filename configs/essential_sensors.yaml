@@ -96,7 +96,7 @@ binary_sensor:
     name: "Battery Charging"
     id: battery_charging
     type: charging
-    device_class: battery
+    device_class: battery_charging
     
   - platform: ups_hid
     ups_hid_id: ups_monitor
