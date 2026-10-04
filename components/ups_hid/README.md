@@ -117,7 +117,9 @@ ups_hid:
 
 **Sensor Platform**: `battery_level`, `input_voltage`, `output_voltage`, `load_percent`, `runtime`, `frequency` + extended sensors
 
-**Binary Sensor Platform**: `online`, `on_battery`, `low_battery`, `charging`, `fault`, `overload`
+**Binary Sensor Platform**: `online`, `on_battery`, `low_battery`, `charging`, `fault`, `overload`, `replace_battery`
+
+`overload` follows the UPS's overload flag with the Eaton protocol; with the other protocols it turns on above 95% load. `replace_battery` turns on when the UPS reports the battery needs replacing (APC, Eaton and generic HID; off on UPSes that don't report it).
 
 **Text Sensor Platform**: `manufacturer`, `model`, `status`, `protocol`, `serial_number`, `firmware_version`
 
@@ -194,13 +196,13 @@ as long as it uses these paths.
 - **Firmware 2.02 units** (e.g. 9PX, 9SX) have a reduced and a full report descriptor; the
   full one is used, as in NUT.
 - **5E series:** reports battery level, runtime, load, input and output voltage, output
-  frequency, beeper status and online/charging state. It has no serial number, battery voltage,
-  input sensitivity or battery test over USB. It charges constantly, so `charging` turns off at
-  100%.
+  frequency, beeper status, online/charging state and the overload and replace-battery flags.
+  It has no serial number, battery voltage, input sensitivity or battery test over USB. It
+  charges constantly, so `charging` turns off at 100%.
 
 To check what your UPS provides, set `ups_hid.eaton: DEBUG`. At detection (at startup and when
-the UPS is plugged back in), the log lists which
-HID path feeds each value. For a full listing of every path (same format as NUT
+the UPS is plugged back in), the log lists which HID path feeds each value, and marks values
+that the model has but the protocol ignores. For a full listing of every path (same format as NUT
 `usbhid-ups -DD`), set the logger level to `VERBOSE`. Please include that log when reporting
 a problem with an Eaton model.
 
