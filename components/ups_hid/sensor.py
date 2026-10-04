@@ -133,14 +133,29 @@ SENSOR_TYPES = {
 }
 
 
-CONFIG_SCHEMA = sensor.sensor_schema(
-    UpsHidSensor,
-    accuracy_decimals=1,
-).extend(
+def _sensor_type_schema(type_defaults):
+    return sensor.sensor_schema(
+        UpsHidSensor,
+        unit_of_measurement=type_defaults.get("unit", cv.UNDEFINED),
+        device_class=type_defaults.get("device_class", cv.UNDEFINED),
+        accuracy_decimals=type_defaults.get("accuracy_decimals", 1),
+    ).extend(
+        {
+            cv.GenerateID(CONF_UPS_HID_ID): cv.use_id(UpsHidComponent),
+        }
+    )
+
+
+# One schema per type: the type's unit, device class and accuracy become schema
+# defaults that YAML can override. ESPHome reads them from the validated config
+# (there are no runtime setters for unit and device class since 2026.9).
+CONFIG_SCHEMA = cv.typed_schema(
     {
-        cv.GenerateID(CONF_UPS_HID_ID): cv.use_id(UpsHidComponent),
-        cv.Required(CONF_TYPE): cv.one_of(*SENSOR_TYPES, lower=True),
-    }
+        sensor_type: _sensor_type_schema(type_defaults)
+        for sensor_type, type_defaults in SENSOR_TYPES.items()
+    },
+    key=CONF_TYPE,
+    lower=True,
 )
 
 
@@ -152,17 +167,3 @@ async def to_code(config):
     sensor_type = config[CONF_TYPE]
     cg.add(var.set_sensor_type(sensor_type))
     cg.add(parent.register_sensor(var, sensor_type))
-
-    # Apply sensor type specific configuration
-    if sensor_type in SENSOR_TYPES:
-        sensor_config = SENSOR_TYPES[sensor_type]
-
-        # Override config with sensor type defaults if not specified
-        if "unit_of_measurement" not in config and "unit" in sensor_config:
-            cg.add(var.set_unit_of_measurement(sensor_config["unit"]))
-
-        if "device_class" not in config and "device_class" in sensor_config:
-            cg.add(var.set_device_class(sensor_config["device_class"]))
-
-        if "accuracy_decimals" not in config and "accuracy_decimals" in sensor_config:
-            cg.add(var.set_accuracy_decimals(sensor_config["accuracy_decimals"]))

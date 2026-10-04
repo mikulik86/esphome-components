@@ -39,11 +39,27 @@ BINARY_SENSOR_TYPES = {
 }
 
 
-CONFIG_SCHEMA = binary_sensor.binary_sensor_schema(UpsHidBinarySensor).extend(
+def _binary_sensor_type_schema(type_defaults):
+    return binary_sensor.binary_sensor_schema(
+        UpsHidBinarySensor,
+        device_class=type_defaults.get("device_class", cv.UNDEFINED),
+    ).extend(
+        {
+            cv.GenerateID(CONF_UPS_HID_ID): cv.use_id(UpsHidComponent),
+        }
+    )
+
+
+# One schema per type: the type's device class becomes a schema default that YAML
+# can override. ESPHome reads it from the validated config (there is no runtime
+# setter for the device class since 2026.9).
+CONFIG_SCHEMA = cv.typed_schema(
     {
-        cv.GenerateID(CONF_UPS_HID_ID): cv.use_id(UpsHidComponent),
-        cv.Required(CONF_TYPE): cv.one_of(*BINARY_SENSOR_TYPES, lower=True),
-    }
+        sensor_type: _binary_sensor_type_schema(type_defaults)
+        for sensor_type, type_defaults in BINARY_SENSOR_TYPES.items()
+    },
+    key=CONF_TYPE,
+    lower=True,
 )
 
 
@@ -55,11 +71,3 @@ async def to_code(config):
     sensor_type = config[CONF_TYPE]
     cg.add(var.set_sensor_type(sensor_type))
     cg.add(parent.register_binary_sensor(var, sensor_type))
-
-    # Apply sensor type specific configuration
-    if sensor_type in BINARY_SENSOR_TYPES:
-        sensor_config = BINARY_SENSOR_TYPES[sensor_type]
-
-        # Override config with sensor type defaults if not specified
-        if "device_class" not in config and "device_class" in sensor_config:
-            cg.add(var.set_device_class(sensor_config["device_class"]))
