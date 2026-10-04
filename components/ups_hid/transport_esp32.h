@@ -48,6 +48,7 @@ public:
     esp_err_t get_hid_report_descriptor(uint8_t descriptor_index,
                                       std::vector<uint8_t>& descriptor) override;
     uint16_t get_device_release() const override;
+    uint32_t get_connection_id() const override { return connection_id_.load(); }
 
     std::string get_last_error() const override;
 
@@ -72,7 +73,8 @@ private:
     mutable std::mutex device_mutex_;
     std::atomic<bool> connected_{false};
     std::atomic<bool> initialized_{false};
-    
+    std::atomic<uint32_t> connection_id_{0};
+
     // USB Host Library management
     TaskHandle_t usb_lib_task_handle_{nullptr};
     TaskHandle_t usb_client_task_handle_{nullptr};

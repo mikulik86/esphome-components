@@ -741,6 +741,7 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
             if (ret == ESP_OK) {
                 ret = find_endpoints();
                 if (ret == ESP_OK) {
+                    connection_id_++;
                     connected_ = true;
                     ESP_LOGI(ESP32_USB_TAG, "UPS device successfully configured and ready");
                     return;
@@ -776,7 +777,12 @@ void Esp32UsbTransport::handle_device_gone(usb_device_handle_t dev_hdl) {
         device_.vendor_id = 0;
         device_.product_id = 0;
         device_.device_release = 0;
-        
+        // find_endpoints() only sets the endpoints it finds, so clear them for the next device
+        device_.ep_in = 0;
+        device_.ep_out = 0;
+        device_.max_packet_size_in = 0;
+        device_.max_packet_size_out = 0;
+
         ESP_LOGI(ESP32_USB_TAG, "USB device disconnected and cleaned up");
     }
 }

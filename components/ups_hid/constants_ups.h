@@ -276,6 +276,8 @@ namespace log_messages {
     static constexpr const char* TOO_MANY_FAILURES = "Too many consecutive protocol detection failures, marking component as failed";
     static constexpr const char* READ_FAILED = "Failed to read UPS data (failure #%" PRIu32 ")";
     static constexpr const char* RESETTING_PROTOCOL = "Too many consecutive read failures - resetting protocol to retry detection";
+    static constexpr const char* DEVICE_DISCONNECTED = "USB device disconnected - protocol will be detected again on reconnect";
+    static constexpr const char* DEVICE_RECONNECTED = "USB device was reconnected - detecting protocol again";
     static constexpr const char* NO_PARENT_COMPONENT = "No UPS HID parent component set";
 }
 

@@ -61,10 +61,21 @@ void UpsHidComponent::setup() {
 void UpsHidComponent::update() {
   if (!transport_ || !transport_->is_connected()) {
     // Device not connected yet - normal during startup or after disconnection
+    if (active_protocol_) {
+      // The next device may be a different UPS, or the same one with new firmware
+      ESP_LOGW(TAG, log_messages::DEVICE_DISCONNECTED);
+      reset_protocol();
+    }
     ESP_LOGD(TAG, log_messages::WAITING_FOR_DEVICE);
     return;
   }
-  
+
+  // An unplug and replug between two updates never shows up as disconnected above
+  if (active_protocol_ && transport_->get_connection_id() != protocol_connection_id_) {
+    ESP_LOGI(TAG, log_messages::DEVICE_RECONNECTED);
+    reset_protocol();
+  }
+
   // Check if protocol detection is needed
   if (!active_protocol_) {
     ESP_LOGI(TAG, log_messages::ATTEMPTING_DETECTION);
@@ -97,8 +108,7 @@ void UpsHidComponent::update() {
     
     if (consecutive_failures_ > max_consecutive_failures_) {
       ESP_LOGW(TAG, log_messages::RESETTING_PROTOCOL);
-      active_protocol_.reset();  // Force protocol re-detection on next update
-      consecutive_failures_ = 0;
+      reset_protocol();  // Force protocol re-detection on next update
     }
   }
 }
@@ -225,8 +235,10 @@ bool UpsHidComponent::detect_protocol() {
     return false;
   }
   
+  // Taken before detection so a replug during detection is caught on the next update
+  uint32_t connection_id = transport_->get_connection_id();
   uint16_t vendor_id = transport_->get_vendor_id();
-  
+
   if (protocol_selection_ == "auto") {
     // Automatic protocol detection based on vendor ID
     ESP_LOGD(TAG, "Auto-detecting protocol for vendor 0x%04X using factory", vendor_id);
@@ -252,16 +264,26 @@ bool UpsHidComponent::detect_protocol() {
     return false;
   }
   
-  ESP_LOGI(TAG, "Protocol initialized: %s", 
+  ESP_LOGI(TAG, "Protocol initialized: %s",
            active_protocol_->get_protocol_name().c_str());
-  
+  protocol_connection_id_ = connection_id;
+
   // Set the detected protocol in ups_data_ after successful detection
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     ups_data_.device.detected_protocol = active_protocol_->get_protocol_type();
   }
-  
+
   return true;
+}
+
+void UpsHidComponent::reset_protocol() {
+  active_protocol_.reset();
+  consecutive_failures_ = 0;
+  set_fast_polling_mode(false);
+
+  std::lock_guard<std::mutex> lock(data_mutex_);
+  ups_data_.device.detected_protocol = DeviceInfo::PROTOCOL_UNKNOWN;
 }
 
 bool UpsHidComponent::read_ups_data() {

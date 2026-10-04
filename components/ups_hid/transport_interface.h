@@ -51,7 +51,11 @@ public:
 
     // Device release number (bcdDevice), 0 if unknown
     virtual uint16_t get_device_release() const { return 0; }
-    
+
+    // Changes every time a device is attached, so a replug between two polls can be
+    // told apart from a connection that never dropped. 0 if not tracked.
+    virtual uint32_t get_connection_id() const { return 0; }
+
     // Error information
     virtual std::string get_last_error() const = 0;
 };

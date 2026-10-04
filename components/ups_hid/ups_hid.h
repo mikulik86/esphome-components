@@ -178,7 +178,8 @@ namespace esphome
       // Clean architecture members
       std::unique_ptr<IUsbTransport> transport_;
       std::unique_ptr<UpsProtocolBase> active_protocol_;
-      
+      uint32_t protocol_connection_id_{0};  // transport connection the protocol was detected on
+
       // Sensor storage (conditional on platform availability)
 #ifdef USE_SENSOR      
       std::unordered_map<std::string, sensor::Sensor *> sensors_;
@@ -194,6 +195,7 @@ namespace esphome
       // Core methods
       bool initialize_transport();
       bool detect_protocol();
+      void reset_protocol();
       bool read_ups_data();
       void update_sensors();
       
