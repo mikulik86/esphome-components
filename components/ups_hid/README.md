@@ -1,6 +1,6 @@
 # UPS HID Component for ESPHome
 
-A ESPHome component for monitoring UPS devices via USB connection on ESP32-S3. Direct USB HID communication with support for APC, CyberPower, and generic HID UPS devices.
+A ESPHome component for monitoring UPS devices via USB connection on ESP32-S3. Direct USB HID communication with support for APC, CyberPower, Eaton, and generic HID UPS devices.
 
 ## Features
 
@@ -10,7 +10,7 @@ A ESPHome component for monitoring UPS devices via USB connection on ESP32-S3. D
 - ⏱️ **Delay configuration**: Configure UPS shutdown, start, and reboot delays via USB HID
 - 🌈 **Visual status indicator**: RGB LED with customizable status colors
 - 🏠 **Home Assistant integration**: Automatic entity discovery via ESPHome API
-- 🔌 **Multi-protocol support**: APC HID, CyberPower HID, Generic HID
+- 🔌 **Multi-protocol support**: APC HID, CyberPower HID, Eaton HID, Generic HID
 - 🎯 **Auto-detection**: Intelligent protocol detection based on USB vendor IDs
 - 🔧 **Robust USB handling**: ESP-IDF v5.4 compatible with 3-tier reconnection recovery
 - 🧪 **Simulation mode**: Test integration without physical UPS device
@@ -66,7 +66,7 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 
 | Vendor | Models | Protocol | Vendor ID | Beeper Control |
 |--------|--------|----------|-----------|----------------|
-| **APC** | Back-UPS ES Series, Smart-UPS | APC HID | 0x051D | ✅ Confirmed |
+| **APC** | Back-UPS, Back-UPS Pro, Smart-UPS (USB HID) | APC HID | 0x051D | 🔧 Model dependent |
 | **CyberPower** | CP1500EPFCLCD, CP1000PFCLCD | CyberPower HID | 0x0764 | ✅ Confirmed |
 | **Eaton/MGE** | 5E 1500i (tested), other 5E, Ellipse, 3S, 5S, 5SC, 5P/5PX, 9E/9SX/9PX | Eaton HID | 0x0463 | 🔧 Model dependent (works on 5E 1500i) |
 | **Tripp Lite** | SMART1500LCDT, UPS series | Generic HID | 0x09AE | ⚠️ Limited |
@@ -81,12 +81,15 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 > value the 5E reports, the switch to battery power, and the beeper enable/disable/mute
 > buttons) and checked against a real Eaton 9PX report descriptor with NUT's parser. Other
 > Eaton models are untested so far. See [Eaton UPS Notes](#eaton-ups-notes).
+>
+> The APC HID protocol now works the same way, with NUT's `apc-hid` paths. It was tested
+> against a simulated Back-UPS ES; see [APC UPS Notes](#apc-ups-notes).
 
 ### Protocol Compatibility Matrix
 
 | Protocol | Communication | Auto-Detection | Read Features | Write Features |
 |----------|---------------|----------------|---------------|----------------|
-| **APC HID** | USB HID reports | ✅ | Battery, voltage, status | ✅ Beeper control |
+| **APC HID** | HID-PDC, paths from report descriptor | ✅ | Battery, voltages, status, ratings, dates, timers | ✅ Beeper, battery and panel test |
 | **CyberPower HID** | Vendor-specific HID | ✅ | Extended sensors, config | ✅ Beeper control |
 | **Eaton HID** | HID-PDC, paths from report descriptor | ✅ | Battery, voltages, status, ratings, timers | ✅ Beeper, battery test |
 | **Generic HID** | Standard HID-PDC | ✅ | Basic monitoring | ⚠️ Limited writes |
@@ -119,7 +122,7 @@ ups_hid:
 
 **Binary Sensor Platform**: `online`, `on_battery`, `low_battery`, `charging`, `fault`, `overload`, `replace_battery`
 
-`overload` follows the UPS's overload flag with the Eaton protocol; with the other protocols it turns on above 95% load. `replace_battery` turns on when the UPS reports the battery needs replacing (APC, Eaton and generic HID; off on UPSes that don't report it).
+`overload` follows the UPS's overload flag with the APC and Eaton protocols; with the other protocols it turns on above 95% load. `replace_battery` turns on when the UPS reports the battery needs replacing (APC, Eaton and generic HID; off on UPSes that don't report it).
 
 A sensor shows *unknown* when the UPS stops reporting its value, for example `input_voltage` on battery with the CyberPower and generic protocols. The APC and Eaton protocols take `online` and `on_battery` from the UPS's status flags and report the measured input voltage. When the UPS is unplugged, sensors and binary sensors become *unknown*, `status` reads `Disconnected`, the other changing text sensors are cleared, and the model, manufacturer and firmware of the last UPS stay. They all update again once the UPS is detected.
 
@@ -155,9 +158,9 @@ ups_hid:
   - Unknown devices: Falls back to Generic HID Protocol
 
 - **`apc`**: Force APC HID Protocol
-  - Use for APC devices: Back-UPS ES, Smart-UPS series
-  - Comprehensive sensor support with 20+ HID reports
-  - Battery and beeper testing (device-dependent)
+  - Use for APC USB HID devices: Back-UPS, Back-UPS Pro, Smart-UPS
+  - Finds values through the UPS's HID report descriptor, so it adapts to each model
+  - Battery and panel test when the model has them
 
 - **`cyberpower`**: Force CyberPower HID Protocol
   - Use for CyberPower CP series devices
@@ -179,6 +182,29 @@ ups_hid:
 - Troubleshooting protocol detection issues
 - Using non-standard USB vendor/product IDs
 - Forcing generic protocol for maximum compatibility
+
+### APC UPS Notes
+
+APC models place the same data in different HID reports. The APC protocol reads the UPS's
+HID report descriptor at startup and looks each value up by its usage path, using the paths
+of NUT's `apc-hid` driver, as the Eaton protocol does for Eaton.
+
+- **Manufacturer, model and serial number** come from the USB device strings. The model and
+  firmware are split out of the product string the way NUT does it:
+  `Back-UPS ES 700G FW:871.O2 .I USB FW:O2` gives model `Back-UPS ES 700G`, firmware
+  `871.O2 .I` and auxiliary firmware `O2`.
+- **Missing sensors are normal.** Back-UPS models do not report output voltage or frequency.
+- **Online and on battery come from the UPS's status flags.** `input_voltage` shows what the
+  UPS measures.
+- **Beeper, battery test and panel test** buttons work when the model exposes those controls;
+  otherwise the log says the action is not supported. There is no beeper test.
+- **Delay settings (`number` entities) are not supported.** As with Eaton, writing a
+  `DelayBeforeShutdown` value starts a real countdown that switches the load off. The
+  `ups_timer_*` sensors show running countdowns.
+
+To check what your UPS provides, set `ups_hid.apc_hid: DEBUG`. At detection, the log lists
+which HID path feeds each value; set the logger level to `VERBOSE` for every path. Please
+include that log when reporting a problem with an APC model.
 
 ### Eaton UPS Notes
 
@@ -235,6 +261,10 @@ logger:
   level: DEBUG                   # See simulation data changes
 ```
 
+The simulated UPS is an APC Back-UPS ES with its own HID report descriptor, read by the APC
+protocol like a real one. Mains power drops for the last 30 seconds of every 5 minutes, and
+the beeper, battery test and panel test buttons change what it reports.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -266,8 +296,9 @@ logger:
   level: DEBUG
   logs:
     ups_hid: DEBUG
-    ups_hid.apc: DEBUG
-    ups_hid.cyberpower: DEBUG
+    ups_hid.apc_hid: DEBUG
+    ups_hid.cyberpower_hid: DEBUG
+    ups_hid.eaton: DEBUG
 ```
 
 **Normal Operation**: Protocol detection < 500ms, consistent update intervals

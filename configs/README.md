@@ -104,7 +104,7 @@ Real-time countdown timer monitoring (5 sensors + analysis):
 UPS delay configuration package (3 number entities + automation scripts):
 
 **Delay Configuration**: `shutdown`, `start`, `reboot` delays (0-600 seconds)
-**Protocol Support**: CyberPower (full), Generic HID (multi-vendor), APC (INPUT-ONLY fallback)
+**Protocol Support**: CyberPower (full), Generic HID (multi-vendor). Not APC or Eaton: their UPSes store no delay over USB HID, and writing one starts a real shutdown countdown.
 **Scripts**: Default delay application and configuration reading
 **Home Assistant**: Number entities with proper device classes and validation
 
@@ -156,7 +156,7 @@ ESPHome Web Server v3 entity organization (10 logical groups):
 APC Back-UPS ES series optimizations:
 - Slower update intervals (15s - APC devices need more time)
 - APC-specific power calculations (405W nominal for ES 700)
-- Enhanced protocol debugging (`ups_hid.apc: DEBUG`)
+- Enhanced protocol debugging (`ups_hid.apc_hid: DEBUG` lists the data points the UPS provides)
 - Fixed device-specific script references
 
 #### `device_types/cyberpower_cp1500.yaml`
@@ -309,6 +309,7 @@ Complete APC UPS production configuration with LED status indication:
 - Custom automation examples and notification setup
 - Choice of standard or grouped entity layout
 - APC-specific timer monitoring and power outage handling
+- No delay configuration package: APC UPSes have no stored delays over USB HID
 
 ### `examples/eaton-ups-monitor.yaml`
 Complete Eaton UPS production configuration with LED status indication:

@@ -94,7 +94,7 @@ If you prefer manual collection, the issue template provides detailed instructio
 
 ### Adding New Protocols
 
-1. **Study existing protocols**: Review `apc_hid_protocol.cpp` or `cyberpower_protocol.cpp`
+1. **Study existing protocols**: For HID Power Device UPSes, follow `protocol_apc.cpp` or `protocol_eaton.cpp`: they list NUT usage paths and let `HidDataPoints` (`hid_data_points.h`) find them in the report descriptor. `protocol_cyberpower.cpp` shows fixed report IDs.
 2. **Use the protocol base class**: Inherit from `UpsProtocolBase`
 3. **Register your protocol**: Use the `REGISTER_UPS_PROTOCOL_FOR_VENDOR` macro, then declare and call its `register_<name>()` function (see `protocol_factory.h`)
 4. **Follow patterns**: Match existing code style and error handling

@@ -37,9 +37,10 @@ packages:
   # timers_grouped: !include ../timer_sensors_grouped.yaml
   # controls_grouped: !include ../ups_controls_grouped.yaml
   
-  # Delay configuration (Shutdown/Start/Reboot timers)
-  delay_config: !include ../delay_config.yaml
-  
+  # Delay configuration is not included: APC UPSes have no stored shutdown/start
+  # delay over USB HID (writing a DelayBeforeShutdown value starts a real countdown
+  # that switches the load off)
+
   # APC-specific optimizations
   apc_device: !include ../device_types/apc_backups_es.yaml
   

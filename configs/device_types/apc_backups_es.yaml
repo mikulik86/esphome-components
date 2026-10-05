@@ -27,7 +27,6 @@ logger:
   level: ${log_level}
   logs:
     ups_hid: DEBUG
-    ups_hid.apc: DEBUG
     ups_hid.apc_hid: DEBUG
     ups_status_led: DEBUG
 
