@@ -6,6 +6,8 @@
 
 #ifdef USE_ESP32
 
+#include <algorithm>
+#include <iterator>
 #include <new>
 
 namespace esphome {
@@ -305,6 +307,11 @@ esp_err_t Esp32UsbTransport::get_hid_report_descriptor(uint8_t descriptor_index,
 uint16_t Esp32UsbTransport::get_device_release() const {
     std::lock_guard<std::mutex> lock(device_mutex_);
     return device_.device_release;
+}
+
+uint8_t Esp32UsbTransport::get_device_string_index(UsbDeviceString which) const {
+    std::lock_guard<std::mutex> lock(device_mutex_);
+    return device_.string_index[static_cast<uint8_t>(which)];
 }
 
 uint16_t Esp32UsbTransport::report_descriptor_length_from_config() const {
@@ -725,7 +732,10 @@ void Esp32UsbTransport::handle_new_device(uint8_t dev_addr) {
         device_.vendor_id = device_desc->idVendor;
         device_.product_id = device_desc->idProduct;
         device_.device_release = device_desc->bcdDevice;
-        
+        device_.string_index[static_cast<uint8_t>(UsbDeviceString::MANUFACTURER)] = device_desc->iManufacturer;
+        device_.string_index[static_cast<uint8_t>(UsbDeviceString::PRODUCT)] = device_desc->iProduct;
+        device_.string_index[static_cast<uint8_t>(UsbDeviceString::SERIAL_NUMBER)] = device_desc->iSerialNumber;
+
         ESP_LOGI(ESP32_USB_TAG, "USB device opened: VID=0x%04X, PID=0x%04X, release=%X.%02X, Speed=%d",
                  device_.vendor_id, device_.product_id, device_.device_release >> 8,
                  device_.device_release & 0xFF, dev_info.speed);
@@ -775,6 +785,7 @@ void Esp32UsbTransport::handle_device_gone(usb_device_handle_t dev_hdl) {
         device_.vendor_id = 0;
         device_.product_id = 0;
         device_.device_release = 0;
+        std::fill(std::begin(device_.string_index), std::end(device_.string_index), 0);
         // find_endpoints() only sets the endpoints it finds, so clear them for the next device
         device_.ep_in = 0;
         device_.ep_out = 0;

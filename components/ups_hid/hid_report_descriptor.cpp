@@ -160,6 +160,13 @@ const UsageName USAGE_NAMES[] = {
     {0x0085008d, "CapacityGranularity1"}, {0x0085008e, "CapacityGranularity2"},
     {0x0085008f, "iOEMInformation"}, {0x008500d0, "ACPresent"}, {0x008500d1, "BatteryPresent"},
     {0x008500d2, "PowerFail"}, {0x008500d8, "VoltageOutOfRange"},
+    // APC vendor page (0xFF86), names from NUT apc-hid.c
+    {0xff860005, "APCGeneralCollection"}, {0xff860006, "APCEnvironment"}, {0xff860007, "APCProbe1"},
+    {0xff860008, "APCProbe2"}, {0xff860016, "APCBattReplaceDate"}, {0xff860019, "APCBattCapBeforeStartup"},
+    {0xff860042, "APC_UPS_FirmwareRevision"}, {0xff860052, "APCLineFailCause"}, {0xff860060, "APCStatusFlag"},
+    {0xff860061, "APCSensitivity"}, {0xff860072, "APCPanelTest"}, {0xff860076, "APCShutdownAfterDelay"},
+    {0xff860079, "APC_USB_FirmwareRevision"}, {0xff86007c, "APCDelayBeforeReboot"},
+    {0xff86007d, "APCDelayBeforeShutdown"}, {0xff86007e, "APCDelayBeforeStartup"},
 };
 
 const char *usage_name(uint32_t usage) {

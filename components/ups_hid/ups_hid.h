@@ -226,7 +226,8 @@ namespace esphome
       uint16_t get_vendor_id() const;
       uint16_t get_product_id() const;
       uint16_t get_device_release() const;
-      
+      uint8_t get_device_string_index(UsbDeviceString which) const;
+
       // Legacy compatibility for protocols
       bool is_device_connected() const { return is_connected(); }
       esp_err_t usb_get_string_descriptor(uint8_t string_index, std::string& result) {

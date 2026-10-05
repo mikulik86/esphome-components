@@ -211,6 +211,10 @@ uint16_t UpsHidComponent::get_device_release() const {
   return transport_ ? transport_->get_device_release() : 0;
 }
 
+uint8_t UpsHidComponent::get_device_string_index(UsbDeviceString which) const {
+  return transport_ ? transport_->get_device_string_index(which) : 0;
+}
+
 // Core implementation methods
 bool UpsHidComponent::initialize_transport() {
   ESP_LOGD(TAG, "Initializing transport layer");

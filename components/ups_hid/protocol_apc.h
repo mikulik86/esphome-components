@@ -1,100 +1,131 @@
 #pragma once
 
 #include "ups_hid.h"
+#include "constants_ups.h"
+#include "hid_data_points.h"
+
+#include <cmath>
+#include <string>
 
 namespace esphome {
 namespace ups_hid {
 
-// APC HID Protocol implementation for modern APC UPS devices
+/**
+ * @brief APC HID Protocol Implementation
+ *
+ * APC UPSes (USB VID 0x051D: Back-UPS, Back-UPS Pro, Smart-UPS, ...) are HID Power
+ * Devices, but report IDs and layouts change between models. Instead of hard-coded
+ * report IDs, this protocol reads the UPS's HID report descriptor and finds each
+ * value by its usage path, using the paths of the NUT apc-hid.c subdriver.
+ * Manufacturer, model and serial number come from the USB device strings, and the
+ * firmware versions from the product string, as in NUT.
+ */
 class ApcHidProtocol : public UpsProtocolBase {
-public:
-  // Public struct for use by report parsers
-  struct HidReport {
-    uint8_t report_id;
-    std::vector<uint8_t> data;
-    
-    HidReport() : report_id(0) {}
-  };
-  
+ public:
   explicit ApcHidProtocol(UpsHidComponent *parent);
-  
+
   bool detect() override;
   bool initialize() override;
   bool read_data(UpsData &data) override;
   DeviceInfo::DetectedProtocol get_protocol_type() const override { return DeviceInfo::PROTOCOL_APC_HID; }
   std::string get_protocol_name() const override { return "APC HID Protocol"; }
-  
-  // Beeper control methods
+
+  // Beeper control (UPS.PowerSummary.AudibleAlarmControl)
   bool beeper_enable() override;
   bool beeper_disable() override;
   bool beeper_mute() override;
-  bool beeper_test() override;
-  
-  // UPS and battery test methods
+
+  // Battery test (UPS.Battery.Test) and front panel test (UPS.APCPanelTest)
   bool start_battery_test_quick() override;
   bool start_battery_test_deep() override;
   bool stop_battery_test() override;
   bool start_ups_test() override;
   bool stop_ups_test() override;
-  
-  // Timer polling for real-time countdown
+
+  // Shutdown/startup/reboot countdowns
   bool read_timer_data(UpsData &data) override;
-  
-  // Delay configuration methods
-  bool set_shutdown_delay(int seconds) override;
-  bool set_start_delay(int seconds) override;
-  bool set_reboot_delay(int seconds) override;
 
-private:
+  // UPS data points located through the report descriptor
+  enum Item : uint8_t {
+    // Identification and ratings
+    ITEM_BATTERY_TYPE,
+    ITEM_BATTERY_MFR_DATE,
+    ITEM_BATTERY_REPLACE_DATE,
+    ITEM_UPS_MFR_DATE,
+    ITEM_BATTERY_VOLTAGE_NOMINAL,
+    ITEM_INPUT_VOLTAGE_NOMINAL,
+    ITEM_OUTPUT_VOLTAGE_NOMINAL,
+    ITEM_ACTIVE_POWER_NOMINAL,
+    // Battery
+    ITEM_BATTERY_CHARGE,
+    ITEM_BATTERY_CHARGE_LOW,
+    ITEM_BATTERY_CHARGE_WARNING,
+    ITEM_BATTERY_RUNTIME,
+    ITEM_BATTERY_RUNTIME_LOW,
+    ITEM_BATTERY_VOLTAGE,
+    // Input / output
+    ITEM_INPUT_VOLTAGE,
+    ITEM_TRANSFER_LOW,
+    ITEM_TRANSFER_HIGH,
+    ITEM_SENSITIVITY,
+    ITEM_OUTPUT_VOLTAGE,
+    ITEM_OUTPUT_FREQUENCY,
+    ITEM_LOAD,
+    ITEM_BEEPER,
+    // Status flags
+    ITEM_AC_PRESENT,
+    ITEM_CHARGING,
+    ITEM_DISCHARGING,
+    ITEM_BELOW_CAPACITY_LIMIT,
+    ITEM_SHUTDOWN_IMMINENT,
+    ITEM_TIME_LIMIT_EXPIRED,
+    ITEM_OVERLOAD,
+    ITEM_NEED_REPLACEMENT,
+    ITEM_BATTERY_PRESENT,
+    ITEM_STATUS_FLAG,
+    // Tests and timers
+    ITEM_BATTERY_TEST,
+    ITEM_PANEL_TEST,
+    ITEM_TIMER_SHUTDOWN,
+    ITEM_TIMER_START,
+    ITEM_TIMER_REBOOT,
+    ITEM_COUNT
+  };
 
-  bool init_hid_communication();
-  bool read_hid_report(uint8_t report_id, HidReport &report);
-  bool write_hid_report(const HidReport &report);
-  
-  void parse_status_report(const HidReport &report, UpsData &data);
-  void parse_battery_report(const HidReport &report, UpsData &data);
-  void parse_voltage_report(const HidReport &report, UpsData &data);
-  void parse_power_report(const HidReport &report, UpsData &data);
-  
-  // NUT-compatible parsers
-  void parse_power_summary_report(const HidReport &report, UpsData &data);
-  void parse_present_status_report(const HidReport &report, UpsData &data);
-  void parse_apc_status_report(const HidReport &report, UpsData &data);
-  void parse_input_voltage_report(const HidReport &report, UpsData &data);
-  void parse_load_report(const HidReport &report, UpsData &data);
+ private:
+  HidDataPoints points_;
+
+  // Read once in initialize()
+  std::string manufacturer_;
+  std::string model_;
+  std::string serial_number_;
+  std::string firmware_version_;
+  std::string firmware_aux_;
+  std::string battery_type_;
+  std::string battery_mfr_date_;
+  std::string ups_mfr_date_;
+  float battery_voltage_nominal_{NAN};
+  float input_voltage_nominal_{NAN};
+  float output_voltage_nominal_{NAN};
+  float active_power_nominal_{NAN};
+
+  bool load_report_descriptor();
+  void fix_report_descriptor();
+  bool read_device_string(UsbDeviceString which, std::string &value);
+
+  bool has(Item item) const { return points_.has(item); }
+  bool read_raw(Item item, int64_t &value) { return points_.read_raw(item, value); }
+  bool read_value(Item item, float &value) { return points_.read_value(item, value); }
+  bool read_flag(Item item, bool &value) { return points_.read_flag(item, value); }
+  bool write_value(Item item, float value, const char *action) { return points_.write_value(item, value, action); }
+
   void read_device_info();
-  void parse_device_info_report(const HidReport &report);
-  void log_raw_data(const uint8_t* buffer, size_t buffer_len);
-  
-  // Device information parsing
-  void read_device_information(UpsData &data);
-  void parse_serial_number_report(const HidReport &report, UpsData &data);
-  void parse_firmware_version_report(const HidReport &report, UpsData &data);
-  void parse_beeper_status_report(const HidReport &report, UpsData &data);
-  void parse_input_sensitivity_report(const HidReport &report, UpsData &data);
-  
-  // Missing dynamic values from NUT analysis
-  void read_missing_dynamic_values(UpsData &data);
-  void parse_battery_voltage_nominal_report(const HidReport &report, UpsData &data);
-  void parse_battery_voltage_actual_report(const HidReport &report, UpsData &data);
-  void parse_input_voltage_nominal_report(const HidReport &report, UpsData &data);
-  void parse_input_transfer_limits_report(const HidReport &report, UpsData &data);
-  void parse_battery_runtime_low_report(const HidReport &report, UpsData &data);
-  void parse_manufacture_date_report(const HidReport &report, UpsData &data, bool is_battery);
-  void parse_ups_delay_shutdown_report(const HidReport &report, UpsData &data);
-  void parse_ups_delay_reboot_report(const HidReport &report, UpsData &data);
-  void parse_battery_charge_threshold_report(const HidReport &report, UpsData &data, bool is_low_threshold);
-  void parse_battery_chemistry_report(const HidReport &report, UpsData &data);
-  void parse_test_result_report(const HidReport &report, UpsData &data);
-  std::string convert_apc_date(uint16_t date_value);
-  
-  // Device model detection and configuration
-  void detect_nominal_power_rating(const std::string& model_name, UpsData &data);
-  
-  // Frequency reading methods
-  void read_frequency_data(UpsData &data);
-  float parse_frequency_from_report(const HidReport &report);
+  bool read_battery(UpsData &data);
+  bool read_power(UpsData &data);
+  bool read_status(UpsData &data);
+  void read_settings(UpsData &data);
+  bool read_timers(UpsData &data);
 };
 
-} // namespace ups_hid
-} // namespace esphome
+}  // namespace ups_hid
+}  // namespace esphome

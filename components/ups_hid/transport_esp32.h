@@ -48,6 +48,7 @@ public:
     esp_err_t get_hid_report_descriptor(uint8_t descriptor_index,
                                       std::vector<uint8_t>& descriptor) override;
     uint16_t get_device_release() const override;
+    uint8_t get_device_string_index(UsbDeviceString which) const override;
     uint32_t get_connection_id() const override { return connection_id_.load(); }
 
     std::string get_last_error() const override;
@@ -64,6 +65,7 @@ private:
         uint16_t vendor_id{0};
         uint16_t product_id{0};
         uint16_t device_release{0};  // bcdDevice
+        uint8_t string_index[3]{};   // iManufacturer, iProduct, iSerialNumber (UsbDeviceString order)
         uint16_t max_packet_size_in{0};
         uint16_t max_packet_size_out{0};
         usb_speed_t speed{USB_SPEED_LOW};

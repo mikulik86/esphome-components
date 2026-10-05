@@ -8,6 +8,9 @@
 namespace esphome {
 namespace ups_hid {
 
+// Strings named by the USB device descriptor (iManufacturer, iProduct, iSerialNumber)
+enum class UsbDeviceString : uint8_t { MANUFACTURER, PRODUCT, SERIAL_NUMBER };
+
 /**
  * Abstract USB Transport Interface
  * 
@@ -51,6 +54,9 @@ public:
 
     // Device release number (bcdDevice), 0 if unknown
     virtual uint16_t get_device_release() const { return 0; }
+
+    // String descriptor index the USB device descriptor gives for a string, 0 if none
+    virtual uint8_t get_device_string_index(UsbDeviceString /*which*/) const { return 0; }
 
     // Changes every time a device is attached, so a replug between two polls can be
     // told apart from a connection that never dropped. 0 if not tracked.

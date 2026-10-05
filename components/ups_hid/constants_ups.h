@@ -257,10 +257,7 @@ namespace usb {
     static constexpr uint16_t VENDOR_ID_APC = 0x051D;
     static constexpr uint16_t VENDOR_ID_CYBERPOWER = 0x0764;
     static constexpr uint16_t VENDOR_ID_EATON = 0x0463;  // Eaton, formerly MGE Office Protection Systems
-    
-    // Common product IDs
-    static constexpr uint16_t PRODUCT_ID_APC_BACK_UPS_ES_700 = 0x0002; // Back-UPS ES 700G (INPUT-ONLY)
-    
+
     // Common HID report IDs used across multiple UPS vendors
     static constexpr uint8_t REPORT_ID_SERIAL_NUMBER = 0x02;  // Serial number string descriptor index
 }

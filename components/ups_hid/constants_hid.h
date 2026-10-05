@@ -113,6 +113,7 @@
 
 // Battery Status
 #define HID_USAGE_BAT_BELOW_REMAINING_CAPACITY_LIMIT 0x0042
+#define HID_USAGE_BAT_REMAINING_TIME_LIMIT_EXPIRED   0x0043
 #define HID_USAGE_BAT_CHARGING                  0x0044
 #define HID_USAGE_BAT_DISCHARGING               0x0045
 #define HID_USAGE_BAT_FULLY_CHARGED             0x0046
@@ -127,6 +128,7 @@
 
 // Battery Configuration
 #define HID_USAGE_BAT_DESIGN_CAPACITY           0x0083
+#define HID_USAGE_BAT_MANUFACTURER_DATE         0x0085
 #define HID_USAGE_BAT_WARNING_CAPACITY_LIMIT    0x008C
 
 // Battery Information
