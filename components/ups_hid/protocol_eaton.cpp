@@ -6,8 +6,6 @@
 #include "freertos/task.h"
 
 #include <algorithm>
-#include <iterator>
-#include <limits>
 
 namespace esphome {
 namespace ups_hid {
@@ -82,18 +80,9 @@ constexpr uint32_t IDX_2 = HID_PATH_INDEX_BASE | 2;
 constexpr uint32_t IDX_3 = HID_PATH_INDEX_BASE | 3;
 constexpr uint32_t IDX_4 = HID_PATH_INDEX_BASE | 4;
 
-constexpr size_t MAX_PATH_NODES = 6;
-
-struct PathDefinition {
-  Item item;
-  const char *name;  // NUT variable fed by this path, for logs
-  uint8_t length;
-  uint32_t nodes[MAX_PATH_NODES];
-};
-
 // Paths as used by NUT mge-hid.c. When several paths feed one item, the first one
 // present in the descriptor is used.
-const PathDefinition EATON_PATHS[] = {
+const HidPathDefinition EATON_PATHS[] = {
     {Item::ITEM_MANUFACTURER, "ups.mfr", 3, {U_UPS, U_POWER_SUMMARY, U_I_MANUFACTURER}},
     {Item::ITEM_PRODUCT, "ups.model (product)", 3, {U_UPS, U_POWER_SUMMARY, U_I_PRODUCT}},
     {Item::ITEM_MODEL, "ups.model (model)", 3, {U_UPS, U_POWER_SUMMARY, MGE_I_MODEL}},
@@ -162,7 +151,7 @@ const PathDefinition EATON_PATHS[] = {
     {Item::ITEM_TIMER_REBOOT, "ups.timer.reboot", 3, {U_UPS, U_POWER_SUMMARY, U_DELAY_BEFORE_REBOOT}},
 };
 constexpr size_t PATH_COUNT = sizeof(EATON_PATHS) / sizeof(EATON_PATHS[0]);
-static_assert(PATH_COUNT < 0xFF, "path index must fit field_rank_");
+static_assert(PATH_COUNT < 0xFF, "path index must fit HidDataPoints ranks");
 
 // Firmware 2.02 exposes a reduced report descriptor (index 0, for the OS battery
 // driver) and the complete one (index 1); NUT libusb1.c reads the complete one
@@ -203,27 +192,8 @@ ChargerState charger_state_from_status(int64_t status) {
   }
 }
 
-// HID PDC Test values (NUT test_read_info)
-const char *test_result_text(int64_t value) {
-  switch (value) {
-    case 1: return test::RESULT_DONE_PASSED;
-    case 2: return test::RESULT_DONE_WARNING;
-    case 3: return test::RESULT_DONE_ERROR;
-    case 4: return test::RESULT_ABORTED;
-    case 5: return test::RESULT_IN_PROGRESS;
-    case 6: return test::RESULT_NO_TEST;
-    case 7: return test::RESULT_SCHEDULED;
-    default: return nullptr;
-  }
-}
-
-bool in_range(float value, float min, float max) { return !std::isnan(value) && value >= min && value <= max; }
-
-int16_t to_timer(float seconds) {
-  const float rounded = std::round(seconds);
-  return static_cast<int16_t>(std::max<float>(std::numeric_limits<int16_t>::min(),
-                                              std::min<float>(std::numeric_limits<int16_t>::max(), rounded)));
-}
+using hid_pdc::in_range;
+using hid_pdc::to_timer;
 
 // The Eaton 5S identifies itself as "Ellipse PRO" (NUT mge_model_names)
 bool is_eaton_5s(const std::string &product, const std::string &model) {
@@ -287,19 +257,10 @@ std::string format_model_name(const std::string &product, const std::string &mod
   return product + " " + model;
 }
 
-const char *report_type_name(uint8_t report_type) {
-  switch (report_type) {
-    case HID_REPORT_TYPE_INPUT: return "Input";
-    case HID_REPORT_TYPE_OUTPUT: return "Output";
-    default: return "Feature";
-  }
-}
-
 }  // namespace
 
-EatonHidProtocol::EatonHidProtocol(UpsHidComponent *parent) : UpsProtocolBase(parent) {
-  std::fill(std::begin(field_rank_), std::end(field_rank_), NO_FIELD);
-}
+EatonHidProtocol::EatonHidProtocol(UpsHidComponent *parent)
+    : UpsProtocolBase(parent), points_(parent, EATON_TAG, EATON_PATHS, PATH_COUNT, ITEM_COUNT) {}
 
 bool EatonHidProtocol::detect() {
   ESP_LOGD(EATON_TAG, "Detecting Eaton HID protocol...");
@@ -322,11 +283,11 @@ bool EatonHidProtocol::detect() {
   }
 
   // Make sure the UPS answers the reports the descriptor promises
-  report_cache_.clear();
+  points_.begin_poll();
   const Item probe = has(ITEM_BATTERY_CHARGE) ? ITEM_BATTERY_CHARGE : ITEM_AC_PRESENT;
   int64_t value;
   if (!read_raw(probe, value)) {
-    ESP_LOGW(EATON_TAG, "UPS did not answer HID report 0x%02X", fields_[probe].report_id);
+    ESP_LOGW(EATON_TAG, "UPS did not answer HID report 0x%02X", points_.field(probe).report_id);
     return false;
   }
 
@@ -338,7 +299,7 @@ bool EatonHidProtocol::initialize() {
   ESP_LOGD(EATON_TAG, "Initializing Eaton HID protocol...");
 
   // Manual protocol selection (protocol: eaton) skips detect(), which loads the descriptor
-  if (!descriptor_loaded_ && !load_report_descriptor()) {
+  if (!points_.loaded() && !load_report_descriptor()) {
     ESP_LOGE(EATON_TAG, "Cannot initialize without the HID report descriptor");
     return false;
   }
@@ -347,45 +308,28 @@ bool EatonHidProtocol::initialize() {
   ESP_LOGI(EATON_TAG, "Eaton HID protocol initialized: %s %s (serial: %s, firmware: %s)", manufacturer_.c_str(),
            model_.empty() ? "UPS" : model_.c_str(), serial_number_.empty() ? "unknown" : serial_number_.c_str(),
            firmware_version_.empty() ? "unknown" : firmware_version_.c_str());
-  log_data_points();  // after read_device_info(): what is used depends on the model
+  // After read_device_info(): what is used depends on the model
+  points_.log_data_points([this](uint8_t item) { return used_on_this_model(static_cast<Item>(item)); });
   return true;
 }
 
 bool EatonHidProtocol::load_report_descriptor() {
-  std::vector<uint8_t> raw;
   esp_err_t err = ESP_FAIL;
 
   if (parent_->get_device_release() == EATON_DUAL_DESCRIPTOR_RELEASE) {
-    err = parent_->get_hid_report_descriptor(EATON_FULL_DESCRIPTOR_INDEX, raw);
+    err = points_.load(EATON_FULL_DESCRIPTOR_INDEX);
     if (err != ESP_OK) {
       ESP_LOGW(EATON_TAG, "Full report descriptor unavailable (%s), using the reduced one", esp_err_to_name(err));
     }
   }
   if (err != ESP_OK) {
-    err = parent_->get_hid_report_descriptor(EATON_DEFAULT_DESCRIPTOR_INDEX, raw);
+    err = points_.load(EATON_DEFAULT_DESCRIPTOR_INDEX);
   }
-  if (err != ESP_OK || raw.empty()) {
+  if (err != ESP_OK) {
     ESP_LOGW(EATON_TAG, "Cannot read the HID report descriptor: %s", esp_err_to_name(err));
     return false;
   }
-
-  std::fill(std::begin(field_rank_), std::end(field_rank_), NO_FIELD);
-  size_t field_count = 0;
-  const bool complete = descriptor_.parse(raw.data(), raw.size(), [this, &field_count](const HidField &field) {
-    field_count++;
-    ESP_LOGV(EATON_TAG, "Path: %s, Type: %s, ReportID: 0x%02X, Offset: %u, Size: %u",
-             HidReportDescriptor::path_to_string(field).c_str(), report_type_name(field.report_type), field.report_id,
-             field.bit_offset, field.bit_size);
-    map_field(field);
-  });
-  if (!complete) {
-    ESP_LOGW(EATON_TAG, "Report descriptor is malformed or truncated, using the %zu fields before the error",
-             field_count);
-  }
-
-  ESP_LOGI(EATON_TAG, "HID report descriptor: %zu bytes, %zu fields", raw.size(), field_count);
-  descriptor_loaded_ = field_count > 0;
-  return descriptor_loaded_;
+  return true;
 }
 
 bool EatonHidProtocol::used_on_this_model(Item item) const {
@@ -396,158 +340,8 @@ bool EatonHidProtocol::used_on_this_model(Item item) const {
   return true;
 }
 
-void EatonHidProtocol::log_data_points() const {
-  size_t found = 0;
-  size_t unused = 0;
-  for (size_t rank = 0; rank < PATH_COUNT; rank++) {
-    const PathDefinition &definition = EATON_PATHS[rank];
-    if (field_rank_[definition.item] != rank) {
-      continue;
-    }
-    const HidField &field = fields_[definition.item];
-    const bool used = used_on_this_model(definition.item);
-    found++;
-    if (!used) {
-      unused++;
-    }
-    ESP_LOGD(EATON_TAG, "  %-28s <- %s (%s report 0x%02X, bit %u, %u bits)%s", definition.name,
-             HidReportDescriptor::path_to_string(field).c_str(), report_type_name(field.report_type), field.report_id,
-             field.bit_offset, field.bit_size, used ? "" : " - not used on this model");
-  }
-
-  ESP_LOGI(EATON_TAG, "%zu of %u Eaton data points found, %zu not used on this model", found,
-           static_cast<unsigned>(ITEM_COUNT), unused);
-}
-
-void EatonHidProtocol::map_field(const HidField &field) {
-  for (size_t rank = 0; rank < PATH_COUNT; rank++) {
-    const PathDefinition &definition = EATON_PATHS[rank];
-    if (!field.matches(definition.nodes, definition.length)) {
-      continue;
-    }
-    const Item item = definition.item;
-    const uint8_t current = field_rank_[item];
-    // Earlier table entries win. For the same path prefer the Feature report, which
-    // is what NUT reads; Input reports with the same ID can have another layout.
-    const bool better = current == NO_FIELD || rank < current ||
-                        (rank == current && field.report_type == HID_REPORT_TYPE_FEATURE &&
-                         fields_[item].report_type != HID_REPORT_TYPE_FEATURE);
-    if (better) {
-      fields_[item] = field;
-      field_rank_[item] = static_cast<uint8_t>(rank);
-    }
-    return;
-  }
-}
-
-bool EatonHidProtocol::read_raw(Item item, int64_t &value) {
-  if (!has(item)) {
-    return false;
-  }
-  const HidField &field = fields_[item];
-
-  // Several values usually share one report: read each report once per poll
-  auto cached = std::find_if(report_cache_.begin(), report_cache_.end(), [&field](const CachedReport &report) {
-    return report.report_id == field.report_id && report.report_type == field.report_type;
-  });
-  if (cached == report_cache_.end()) {
-    CachedReport report{field.report_id, field.report_type, false, {}};
-    size_t length = descriptor_.report_size(field.report_id, field.report_type);
-    if (length == 0 || length > limits::MAX_HID_REPORT_SIZE) {
-      length = limits::MAX_HID_REPORT_SIZE;
-    }
-    uint8_t buffer[limits::MAX_HID_REPORT_SIZE];
-    size_t received = length;
-    esp_err_t err = parent_->hid_get_report(field.report_type, field.report_id, buffer, &received,
-                                            parent_->get_protocol_timeout());
-    if (err != ESP_OK || received == 0) {
-      ESP_LOGV(EATON_TAG, "%s report 0x%02X failed: %s", report_type_name(field.report_type), field.report_id,
-               esp_err_to_name(err));
-    } else if (field.report_id != 0 && buffer[0] != field.report_id) {
-      ESP_LOGD(EATON_TAG, "%s report 0x%02X answered with report ID 0x%02X, ignoring",
-               report_type_name(field.report_type), field.report_id, buffer[0]);
-    } else {
-      report.valid = true;
-      report.data.assign(buffer, buffer + received);
-    }
-    report_cache_.push_back(std::move(report));
-    cached = report_cache_.end() - 1;
-  }
-
-  return cached->valid && field.extract(cached->data.data(), cached->data.size(), value);
-}
-
-bool EatonHidProtocol::read_value(Item item, float &value) {
-  int64_t raw;
-  if (!read_raw(item, raw)) {
-    return false;
-  }
-  value = static_cast<float>(fields_[item].to_physical(raw));
-  return true;
-}
-
-bool EatonHidProtocol::read_flag(Item item, bool &value) {
-  int64_t raw;
-  if (!read_raw(item, raw)) {
-    return false;
-  }
-  value = raw != 0;
-  return true;
-}
-
-bool EatonHidProtocol::read_string(Item item, std::string &value) {
-  int64_t index;
-  if (!read_raw(item, index) || index <= 0 || index > UINT8_MAX) {
-    return false;
-  }
-  std::string text;
-  if (parent_->get_string_descriptor(static_cast<uint8_t>(index), text) != ESP_OK || text.empty()) {
-    return false;
-  }
-  value = text;
-  return true;
-}
-
-bool EatonHidProtocol::write_value(Item item, float value, const char *action) {
-  if (!has(item)) {
-    ESP_LOGW(EATON_TAG, "%s: not supported by this UPS", action);
-    return false;
-  }
-  const HidField &field = fields_[item];
-  if (field.report_type != HID_REPORT_TYPE_FEATURE) {
-    ESP_LOGW(EATON_TAG, "%s: control is read-only on this UPS", action);
-    return false;
-  }
-
-  const size_t length = descriptor_.report_size(field.report_id, HID_REPORT_TYPE_FEATURE);
-  uint8_t report[limits::MAX_HID_REPORT_SIZE];
-  if (length == 0 || length > sizeof(report)) {
-    ESP_LOGW(EATON_TAG, "%s: unsupported report size %zu", action, length);
-    return false;
-  }
-
-  // Read-modify-write, so other settings in the same report keep their values
-  size_t received = length;
-  esp_err_t err = parent_->hid_get_report(HID_REPORT_TYPE_FEATURE, field.report_id, report, &received,
-                                          parent_->get_protocol_timeout());
-  if (err != ESP_OK || received < length || (field.report_id != 0 && report[0] != field.report_id)) {
-    ESP_LOGW(EATON_TAG, "%s: cannot read report 0x%02X before writing it", action, field.report_id);
-    return false;
-  }
-  field.insert(report, length, field.to_logical(value));
-
-  err = parent_->hid_set_report(HID_REPORT_TYPE_FEATURE, field.report_id, report, length,
-                                parent_->get_protocol_timeout());
-  if (err != ESP_OK) {
-    ESP_LOGW(EATON_TAG, "%s: HID SET_REPORT 0x%02X failed: %s", action, field.report_id, esp_err_to_name(err));
-    return false;
-  }
-  ESP_LOGI(EATON_TAG, "%s: command sent", action);
-  return true;
-}
-
 void EatonHidProtocol::read_device_info() {
-  report_cache_.clear();
+  points_.begin_poll();
 
   if (!read_string(ITEM_MANUFACTURER, manufacturer_)) {
     manufacturer_ = EATON_MANUFACTURER;
@@ -589,7 +383,7 @@ void EatonHidProtocol::read_device_info() {
 }
 
 bool EatonHidProtocol::read_data(UpsData &data) {
-  report_cache_.clear();
+  points_.begin_poll();
 
   bool success = read_battery(data);
   success |= read_power(data);
@@ -823,7 +617,7 @@ void EatonHidProtocol::read_settings(UpsData &data) {
   }
 
   if (read_raw(ITEM_BATTERY_TEST, raw)) {
-    const char *result = test_result_text(raw);
+    const char *result = hid_pdc::test_result_text(raw);
     if (result != nullptr) {
       data.test.ups_test_result = result;
     }
@@ -870,7 +664,7 @@ bool EatonHidProtocol::read_timers(UpsData &data) {
 }
 
 bool EatonHidProtocol::read_timer_data(UpsData &data) {
-  report_cache_.clear();
+  points_.begin_poll();
   return read_timers(data);
 }
 

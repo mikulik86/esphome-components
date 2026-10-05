@@ -2,7 +2,7 @@
 
 #include "ups_hid.h"
 #include "constants_ups.h"
-#include "hid_report_descriptor.h"
+#include "hid_data_points.h"
 
 #include <cmath>
 #include <string>
@@ -109,20 +109,7 @@ class EatonHidProtocol : public UpsProtocolBase {
   };
 
  private:
-  static constexpr uint8_t NO_FIELD = 0xFF;
-
-  struct CachedReport {
-    uint8_t report_id;
-    uint8_t report_type;
-    bool valid;
-    std::vector<uint8_t> data;
-  };
-
-  HidReportDescriptor descriptor_;
-  HidField fields_[ITEM_COUNT];
-  uint8_t field_rank_[ITEM_COUNT];        // index of the matched path definition, NO_FIELD if absent
-  std::vector<CachedReport> report_cache_;  // reports read during the current poll
-  bool descriptor_loaded_{false};
+  HidDataPoints points_;
 
   // Read once in initialize()
   std::string manufacturer_;
@@ -138,16 +125,14 @@ class EatonHidProtocol : public UpsProtocolBase {
   bool summary_voltage_is_battery_{false};
 
   bool load_report_descriptor();
-  void map_field(const HidField &field);
-  bool has(Item item) const { return field_rank_[item] != NO_FIELD; }
   bool used_on_this_model(Item item) const;
-  void log_data_points() const;
 
-  bool read_raw(Item item, int64_t &value);
-  bool read_value(Item item, float &value);
-  bool read_flag(Item item, bool &value);
-  bool read_string(Item item, std::string &value);
-  bool write_value(Item item, float value, const char *action);
+  bool has(Item item) const { return points_.has(item); }
+  bool read_raw(Item item, int64_t &value) { return points_.read_raw(item, value); }
+  bool read_value(Item item, float &value) { return points_.read_value(item, value); }
+  bool read_flag(Item item, bool &value) { return points_.read_flag(item, value); }
+  bool read_string(Item item, std::string &value) { return points_.read_string(item, value); }
+  bool write_value(Item item, float value, const char *action) { return points_.write_value(item, value, action); }
 
   void read_device_info();
   bool read_battery(UpsData &data);
