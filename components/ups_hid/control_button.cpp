@@ -53,10 +53,11 @@ void UpsHidButton::press_action() {
   if (button_type_ == BUTTON_TYPE_BEEPER) {
     ESP_LOGI(BUTTON_TAG, "Executing beeper action: %s", beeper_action_.c_str());
     
+    // Enable and disable go through the component, which keeps a Beeper switch in step
     if (beeper_action_ == beeper::ACTION_ENABLE) {
-      success = active_protocol->beeper_enable();
+      success = parent_->beeper_enable();
     } else if (beeper_action_ == beeper::ACTION_DISABLE) {
-      success = active_protocol->beeper_disable();
+      success = parent_->beeper_disable();
     } else if (beeper_action_ == beeper::ACTION_MUTE) {
       success = active_protocol->beeper_mute();
     } else if (beeper_action_ == beeper::ACTION_TEST) {

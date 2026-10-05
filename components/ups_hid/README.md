@@ -132,6 +132,23 @@ A sensor shows *unknown* when the UPS stops reporting its value, for example `in
 
 **Button Platform**: Beeper control (`enable`, `disable`, `mute`, `test`) + UPS testing (`battery_quick`, `battery_deep`, `ups_test`)
 
+**Switch Platform**: `beeper` keeps the UPS beeper enabled or disabled. The ESP saves the
+setting, and when the UPS reports a different one after a poll, the component sets it back.
+The Eaton 5E, for example, enables its beeper again after being switched off and on. A muted
+beeper (an alarm silenced for now) is left alone. The beeper `enable` and `disable` buttons
+and the NUT `beeper.enable` / `beeper.disable` commands move the switch too. Works with the
+APC and Eaton protocols.
+
+```yaml
+switch:
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    type: beeper
+    name: "UPS Beeper"
+    # restore_mode: RESTORE_DEFAULT_ON (default) starts on until the switch is changed;
+    # DISABLED takes over the UPS's own setting at each start instead of saving one
+```
+
 **Number Platform**: Delay configuration (`shutdown`, `start`, `reboot`)
 
 > **📦 Complete configuration examples with all platforms are available in [`configs/README.md`](../../configs/README.md)**
@@ -235,7 +252,8 @@ as long as it uses these paths.
 - **5E series:** reports battery level, runtime, load, input and output voltage, output
   frequency, beeper status, online/charging state and the overload and replace-battery flags.
   It has no serial number, battery voltage, input sensitivity or battery test over USB. It
-  charges constantly, so `charging` turns off at 100%.
+  charges constantly, so `charging` turns off at 100%. It enables its beeper again after
+  being switched off and on; the `beeper` switch keeps it disabled.
 
 To check what your UPS provides, set `ups_hid.eaton: DEBUG`. At detection (at startup and when
 the UPS is plugged back in), the log lists which HID path feeds each value, and marks values

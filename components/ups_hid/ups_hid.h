@@ -141,6 +141,7 @@ namespace esphome
       void register_text_sensor(text_sensor::TextSensor *sens, const std::string &type);
 #endif
       void register_delay_number(class UpsDelayNumber *number);
+      void set_beeper_switch(class UpsBeeperSwitch *beeper_switch) { beeper_switch_ = beeper_switch; }
       
       // Protocol access for button components
       UpsProtocolBase* get_active_protocol() const { return active_protocol_.get(); }
@@ -192,6 +193,8 @@ namespace esphome
       std::unordered_map<std::string, text_sensor::TextSensor *> text_sensors_;
 #endif
       std::vector<class UpsDelayNumber *> delay_numbers_;
+      class UpsBeeperSwitch *beeper_switch_{nullptr};  // wanted beeper setting, kept on the UPS
+      bool beeper_write_failed_{false};                 // warn once, not after every poll
 
       // Core methods
       bool initialize_transport();
@@ -200,6 +203,8 @@ namespace esphome
       void publish_unknown_states(const char *status_text);
       bool read_ups_data();
       void update_sensors();
+      bool set_beeper_enabled(bool enabled);
+      void keep_beeper_setting();
       
       // Timer polling methods
       void check_and_update_timers();

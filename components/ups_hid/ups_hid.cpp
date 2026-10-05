@@ -10,6 +10,9 @@
 #include "protocol_cyberpower.h"
  
 #include "protocol_generic.h"
+#ifdef USE_SWITCH
+#include "control_switch.h"
+#endif
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 #include <cinttypes>
@@ -109,6 +112,7 @@ void UpsHidComponent::update() {
   // Normal data reading with active protocol
   if (read_ups_data()) {
     update_sensors();
+    keep_beeper_setting();
     consecutive_failures_ = 0;
     last_successful_read_ = millis();
     
@@ -297,6 +301,7 @@ bool UpsHidComponent::detect_protocol() {
 void UpsHidComponent::reset_protocol() {
   active_protocol_.reset();
   consecutive_failures_ = 0;
+  beeper_write_failed_ = false;
   set_fast_polling_mode(false);
 
   // Drop the last readings so the getters report no data instead of stale values
@@ -628,20 +633,67 @@ bool UpsHidComponent::stop_ups_test() {
 }
 
 // Beeper control methods
-bool UpsHidComponent::beeper_enable() {
+bool UpsHidComponent::beeper_enable() { return set_beeper_enabled(true); }
+
+bool UpsHidComponent::beeper_disable() { return set_beeper_enabled(false); }
+
+bool UpsHidComponent::set_beeper_enabled(bool enabled) {
+#ifdef USE_SWITCH
+  // Buttons, NUT commands and the switch all change the wanted setting, or the next poll
+  // would set the beeper back
+  if (beeper_switch_ != nullptr) {
+    beeper_switch_->set_wanted(enabled);
+    beeper_write_failed_ = false;
+  }
+#endif
   if (!active_protocol_) {
+#ifdef USE_SWITCH
+    if (beeper_switch_ != nullptr) {
+      ESP_LOGI(TAG, "Beeper will be %s once a UPS is connected", enabled ? "enabled" : "disabled");
+      return false;
+    }
+#endif
     ESP_LOGW(TAG, "No active protocol for beeper control");
     return false;
   }
-  return active_protocol_->beeper_enable();
+  return enabled ? active_protocol_->beeper_enable() : active_protocol_->beeper_disable();
 }
 
-bool UpsHidComponent::beeper_disable() {
-  if (!active_protocol_) {
-    ESP_LOGW(TAG, "No active protocol for beeper control");
-    return false;
+void UpsHidComponent::keep_beeper_setting() {
+#ifdef USE_SWITCH
+  if (beeper_switch_ == nullptr || !active_protocol_) {
+    return;
   }
-  return active_protocol_->beeper_disable();
+  ConfigData::BeeperState actual;
+  {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    actual = ups_data_.config.beeper_state;
+  }
+  // Unknown: the UPS does not report its beeper. Muted: an alarm silenced for now, left alone
+  if (actual != ConfigData::BEEPER_ENABLED && actual != ConfigData::BEEPER_DISABLED) {
+    return;
+  }
+  const bool enabled = actual == ConfigData::BEEPER_ENABLED;
+  if (!beeper_switch_->has_wanted()) {
+    beeper_switch_->set_wanted(enabled);  // restore_mode DISABLED: follow the UPS
+    return;
+  }
+  const bool wanted = beeper_switch_->state;
+  if (enabled == wanted) {
+    return;
+  }
+
+  // For example the Eaton 5E enables its beeper again after being switched off and on
+  const bool ok = wanted ? active_protocol_->beeper_enable() : active_protocol_->beeper_disable();
+  if (ok) {
+    ESP_LOGI(TAG, "UPS beeper was %s, %s it again as set by the Beeper switch", enabled ? "enabled" : "disabled",
+             wanted ? "enabling" : "disabling");
+  } else if (!beeper_write_failed_) {
+    ESP_LOGW(TAG, "UPS beeper is %s, but %s it failed; retrying after each poll", enabled ? "enabled" : "disabled",
+             wanted ? "enabling" : "disabling");
+  }
+  beeper_write_failed_ = !ok;
+#endif
 }
 
 bool UpsHidComponent::beeper_mute() {

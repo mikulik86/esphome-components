@@ -30,6 +30,13 @@ ups_hid:
   protocol: auto
   simulation_mode: ${simulation_mode}
 
+# Beeper setting kept on the UPS (the simulated UPS accepts beeper writes)
+switch:
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    type: beeper
+    name: "UPS Beeper"
+
 # Reduced logging for simulation
 logger:
   level: ${log_level}
