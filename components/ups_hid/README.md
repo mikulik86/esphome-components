@@ -121,6 +121,8 @@ ups_hid:
 
 `overload` follows the UPS's overload flag with the Eaton protocol; with the other protocols it turns on above 95% load. `replace_battery` turns on when the UPS reports the battery needs replacing (APC, Eaton and generic HID; off on UPSes that don't report it).
 
+A sensor shows *unknown* when the UPS stops reporting its value, for example `input_voltage` while running on battery. When the UPS is unplugged, sensors and binary sensors become *unknown*, `status` reads `Disconnected`, the other changing text sensors are cleared, and the model, manufacturer and firmware of the last UPS stay. They all update again once the UPS is detected.
+
 **Text Sensor Platform**: `manufacturer`, `model`, `status`, `protocol`, `serial_number`, `firmware_version`
 
 **Button Platform**: Beeper control (`enable`, `disable`, `mute`, `test`) + UPS testing (`battery_quick`, `battery_deep`, `ups_test`)

@@ -197,6 +197,7 @@ namespace esphome
       bool initialize_transport();
       bool detect_protocol();
       void reset_protocol();
+      void publish_unknown_states(const char *status_text);
       bool read_ups_data();
       void update_sensors();
       

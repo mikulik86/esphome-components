@@ -65,6 +65,7 @@ void UpsHidComponent::update() {
       // The next device may be a different UPS, or the same one with new firmware
       ESP_LOGW(TAG, log_messages::DEVICE_DISCONNECTED);
       reset_protocol();
+      publish_unknown_states(status::DISCONNECTED);
     }
     ESP_LOGD(TAG, log_messages::WAITING_FOR_DEVICE);
     return;
@@ -109,6 +110,7 @@ void UpsHidComponent::update() {
     if (consecutive_failures_ > max_consecutive_failures_) {
       ESP_LOGW(TAG, log_messages::RESETTING_PROTOCOL);
       reset_protocol();  // Force protocol re-detection on next update
+      publish_unknown_states(status::UNKNOWN);
     }
   }
 }
@@ -286,6 +288,41 @@ void UpsHidComponent::reset_protocol() {
   ups_data_.device.detected_protocol = DeviceInfo::PROTOCOL_UNKNOWN;
 }
 
+void UpsHidComponent::publish_unknown_states(const char *status_text) {
+  // No UPS data any more: show the entities as unknown instead of the last readings
+#ifdef USE_SENSOR
+  for (auto &sensor_pair : sensors_) {
+    sensor::Sensor *sensor = sensor_pair.second;
+    if (sensor->has_state() && !std::isnan(sensor->state)) {
+      sensor->publish_state(NAN);
+    }
+  }
+#endif
+#ifdef USE_BINARY_SENSOR
+  for (auto &sensor_pair : binary_sensors_) {
+    sensor_pair.second->invalidate_state();
+  }
+#endif
+#ifdef USE_TEXT_SENSOR
+  // Text sensors have no unknown state: the status names the condition, the other live
+  // values are cleared, and the identity of the last UPS (model, firmware, ...) is kept
+  for (auto &sensor_pair : text_sensors_) {
+    const std::string &type = sensor_pair.first;
+    text_sensor::TextSensor *sensor = sensor_pair.second;
+    if (type == text_sensor_type::STATUS) {
+      sensor->publish_state(status_text);
+    } else if (type == text_sensor_type::PROTOCOL) {
+      sensor->publish_state(get_protocol_name());
+    } else if (type == text_sensor_type::BATTERY_STATUS || type == text_sensor_type::UPS_BEEPER_STATUS ||
+               type == text_sensor_type::INPUT_SENSITIVITY || type == text_sensor_type::UPS_TEST_RESULT) {
+      if (sensor->has_state() && !sensor->state.empty()) {
+        sensor->publish_state("");
+      }
+    }
+  }
+#endif
+}
+
 bool UpsHidComponent::read_ups_data() {
   if (!active_protocol_) {
     ESP_LOGW(TAG, "No active protocol for reading data");
@@ -389,6 +426,9 @@ void UpsHidComponent::update_sensors() {
     
     if (!std::isnan(value)) {
       sensor->publish_state(value);
+    } else if (sensor->has_state() && !std::isnan(sensor->state)) {
+      // The reading is gone (e.g. input voltage on battery): unknown, not the last value
+      sensor->publish_state(NAN);
     }
   }
 #endif
