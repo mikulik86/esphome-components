@@ -35,6 +35,7 @@ logger:
   level: ${log_level}
   logs:
     ups_hid: INFO
+    nut_server: INFO  # base_ups.yaml sets DEBUG, which ESPHome rejects below the INFO level
 
 # Simulation validation script
 script:
