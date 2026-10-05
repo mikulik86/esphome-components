@@ -66,7 +66,7 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 
 | Vendor | Models | Protocol | Vendor ID | Beeper Control |
 |--------|--------|----------|-----------|----------------|
-| **APC** | Back-UPS, Back-UPS Pro, Smart-UPS (USB HID) | APC HID | 0x051D | 🔧 Model dependent |
+| **APC** | Back-UPS BX2200MI (tested), other Back-UPS, Back-UPS Pro, Smart-UPS (USB HID) | APC HID | 0x051D | 🔧 Model dependent (works on BX2200MI) |
 | **CyberPower** | CP1500EPFCLCD, CP1000PFCLCD | CyberPower HID | 0x0764 | ✅ Confirmed |
 | **Eaton/MGE** | 5E 1500i (tested), other 5E, Ellipse, 3S, 5S, 5SC, 5P/5PX, 9E/9SX/9PX | Eaton HID | 0x0463 | 🔧 Model dependent (works on 5E 1500i) |
 | **Tripp Lite** | SMART1500LCDT, UPS series | Generic HID | 0x09AE | ⚠️ Limited |
@@ -82,8 +82,10 @@ UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
 > buttons) and checked against a real Eaton 9PX report descriptor with NUT's parser. Other
 > Eaton models are untested so far. See [Eaton UPS Notes](#eaton-ups-notes).
 >
-> The APC HID protocol now works the same way, with NUT's `apc-hid` paths. It was tested
-> against a simulated Back-UPS ES; see [APC UPS Notes](#apc-ups-notes).
+> The APC HID protocol now works the same way, with NUT's `apc-hid` paths. It was tested on
+> an APC Back-UPS BX2200MI (every value the BX reports, the switch to battery power and the
+> beeper enable/disable buttons) and against a simulated Back-UPS ES. Other APC models are
+> untested so far. See [APC UPS Notes](#apc-ups-notes).
 
 ### Protocol Compatibility Matrix
 
@@ -201,6 +203,11 @@ of NUT's `apc-hid` driver, as the Eaton protocol does for Eaton.
 - **Delay settings (`number` entities) are not supported.** As with Eaton, writing a
   `DelayBeforeShutdown` value starts a real countdown that switches the load off. The
   `ups_timer_*` sensors show running countdowns.
+- **Back-UPS BX2200MI:** reports battery level, runtime, battery voltage and its nominal
+  value, input voltage, transfer thresholds, sensitivity, load, its real power rating
+  (`ups_realpower_nominal`), battery and UPS manufacture dates, beeper status, battery test
+  result, status flags and countdowns. It has no output voltage or frequency and no panel test.
+  Its input voltage range needs NUT's report descriptor fix, which is applied.
 
 To check what your UPS provides, set `ups_hid.apc_hid: DEBUG`. At detection, the log lists
 which HID path feeds each value; set the logger level to `VERBOSE` for every path. Please
