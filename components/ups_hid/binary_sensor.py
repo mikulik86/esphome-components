@@ -21,9 +21,8 @@ BINARY_SENSOR_TYPES = {
     "online": {
         "device_class": DEVICE_CLASS_POWER,
     },
-    "on_battery": {
-        "device_class": DEVICE_CLASS_PROBLEM,
-    },
+    # No device class: Home Assistant has none for "on battery", so it reads On / Off
+    "on_battery": {},
     "low_battery": {
         "device_class": DEVICE_CLASS_BATTERY,
     },
