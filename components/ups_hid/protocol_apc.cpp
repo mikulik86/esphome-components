@@ -494,16 +494,12 @@ void ApcReportParser::parse_present_status_report(const HidReport &report, UpsDa
     ESP_LOGD(APC_HID_TAG, "Second status byte: 0x%02X, Overload: %d", second_byte, overload);
   }
   
-  // Update power status based on AC presence and discharging
-  if (ac_present && !discharging) {
-    // Note: Can't access parent_->get_fallback_nominal_voltage() in static method
-    // The voltage will be set by the actual voltage reports if available
-    data.power.status = status::ONLINE;
-  } else {
-    data.power.input_voltage = NAN;     // No AC input
-    data.power.status = status::ON_BATTERY;
-  }
-  
+  // Online / on battery from the UPS's own flags; the input voltage stays as measured
+  const bool on_battery = !ac_present || discharging;
+  data.power.on_battery_reported = true;
+  data.power.on_battery = on_battery;
+  data.power.status = on_battery ? status::ON_BATTERY : status::ONLINE;
+
   // Update battery status
   if (charging) {
     data.battery.status = battery_status::CHARGING;
@@ -671,16 +667,12 @@ void ApcReportParser::parse_status_report(const HidReport &report, UpsData &data
   bool internal_failure = status_byte & APC_STATUS_INTERNAL_FAILURE;     // Bit 6: Internal failure
   bool need_replacement = status_byte & APC_STATUS_NEED_REPLACEMENT;     // Bit 7: Need replacement
   
-  // Update power status based on AC presence and discharging
-  if (ac_present && !discharging) {
-    // Note: Can't access parent_->get_fallback_nominal_voltage() in static method
-    // The voltage will be set by the actual voltage reports if available
-    data.power.status = status::ONLINE;
-  } else {
-    data.power.input_voltage = NAN;     // No AC input
-    data.power.status = status::ON_BATTERY;
-  }
-  
+  // Online / on battery from the UPS's own flags; the input voltage stays as measured
+  const bool on_battery = !ac_present || discharging;
+  data.power.on_battery_reported = true;
+  data.power.on_battery = on_battery;
+  data.power.status = on_battery ? status::ON_BATTERY : status::ONLINE;
+
   // Update battery status
   if (charging) {
     data.battery.status = battery_status::CHARGING;
