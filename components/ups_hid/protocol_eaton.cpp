@@ -703,16 +703,10 @@ bool EatonHidProtocol::read_status(UpsData &data) {
     on_battery = false;
   }
 
-  // The component derives online/on battery from the input voltage
-  if (on_battery) {
-    if (data.power.input_voltage_valid()) {
-      data.power.input_voltage = NAN;  // brownout reading would look like utility power
-    }
-  } else if (!data.power.input_voltage_valid()) {
-    // Offline models (Ellipse, 3S, Protection Station) do not measure the input voltage
-    data.power.input_voltage =
-        !std::isnan(input_voltage_nominal_) ? input_voltage_nominal_ : parent_->get_fallback_nominal_voltage();
-  }
+  // Online and on battery come from these flags, so the input voltage stays as measured:
+  // a few volts in an outage, the real value in a brownout, unknown on offline models
+  data.power.on_battery_reported = has_battery_used || has_ac_present || has_main_input_used || has_discharging;
+  data.power.on_battery = on_battery;
 
   bool boost = false, buck = false, overload = false;
   bool internal_failure = false, over_temperature = false, fan_failure = false;

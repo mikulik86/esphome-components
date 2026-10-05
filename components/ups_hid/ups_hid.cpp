@@ -25,13 +25,24 @@ namespace {
 // is_*() getters so entities, NUT server and status LED always agree
 
 bool ups_online(const UpsData &data) {
-  // UPS is online when input voltage is valid
+  // The UPS's own state when the protocol reads it, otherwise utility voltage present
+  if (data.power.on_battery_reported) {
+    return !data.power.on_battery;
+  }
   return data.power.input_voltage_valid();
+}
+
+bool ups_on_battery(const UpsData &data) {
+  if (data.power.on_battery_reported) {
+    return data.power.on_battery;
+  }
+  // No utility voltage, but the UPS is reporting (not just missing data)
+  return (data.battery.is_valid() || data.power.is_valid()) && !data.power.input_voltage_valid();
 }
 
 bool ups_charging(const UpsData &data) {
   // Charging when online AND battery level is not 100%
-  return data.power.input_voltage_valid() &&
+  return ups_online(data) &&
          data.battery.is_valid() &&
          !std::isnan(data.battery.level) &&
          data.battery.level < 100.0f;
@@ -284,7 +295,9 @@ void UpsHidComponent::reset_protocol() {
   consecutive_failures_ = 0;
   set_fast_polling_mode(false);
 
+  // Drop the last readings so the getters report no data instead of stale values
   std::lock_guard<std::mutex> lock(data_mutex_);
+  ups_data_.reset();
   ups_data_.device.detected_protocol = DeviceInfo::PROTOCOL_UNKNOWN;
 }
 
@@ -444,7 +457,7 @@ void UpsHidComponent::update_sensors() {
     if (type == binary_sensor_type::ONLINE) {
       state = ups_online(ups_data_);
     } else if (type == binary_sensor_type::ON_BATTERY) {
-      state = !ups_online(ups_data_);
+      state = ups_on_battery(ups_data_);
     } else if (type == binary_sensor_type::LOW_BATTERY) {
       state = ups_data_.battery.is_low();
     } else if (type == binary_sensor_type::CHARGING) {
@@ -785,8 +798,7 @@ bool UpsHidComponent::is_online() const {
 
 bool UpsHidComponent::is_on_battery() const {
   std::lock_guard<std::mutex> lock(data_mutex_);
-  // UPS is on battery when NOT online (opposite of online state)
-  return !ups_online(ups_data_);
+  return ups_on_battery(ups_data_);
 }
 
 bool UpsHidComponent::is_low_battery() const {

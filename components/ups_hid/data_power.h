@@ -28,6 +28,8 @@ struct PowerData {
   std::string status{};                // Power status text (Online, On Battery, etc.)
   bool overload_reported{false};       // The protocol read the UPS's own overload flag
   bool overload{false};                // That flag, valid when overload_reported is set
+  bool on_battery_reported{false};     // The protocol read the UPS's own on-battery state
+  bool on_battery{false};              // That state, valid when on_battery_reported is set
 
   // Power quality indicators
   bool input_voltage_valid() const {

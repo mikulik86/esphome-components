@@ -121,7 +121,7 @@ ups_hid:
 
 `overload` follows the UPS's overload flag with the Eaton protocol; with the other protocols it turns on above 95% load. `replace_battery` turns on when the UPS reports the battery needs replacing (APC, Eaton and generic HID; off on UPSes that don't report it).
 
-A sensor shows *unknown* when the UPS stops reporting its value, for example `input_voltage` while running on battery. When the UPS is unplugged, sensors and binary sensors become *unknown*, `status` reads `Disconnected`, the other changing text sensors are cleared, and the model, manufacturer and firmware of the last UPS stay. They all update again once the UPS is detected.
+A sensor shows *unknown* when the UPS stops reporting its value, for example `input_voltage` on battery with the APC, CyberPower and generic protocols (the Eaton protocol reports the measured value). When the UPS is unplugged, sensors and binary sensors become *unknown*, `status` reads `Disconnected`, the other changing text sensors are cleared, and the model, manufacturer and firmware of the last UPS stay. They all update again once the UPS is detected.
 
 **Text Sensor Platform**: `manufacturer`, `model`, `status`, `protocol`, `serial_number`, `firmware_version`
 
@@ -188,8 +188,10 @@ the paths and model quirks of NUT's `mge-hid` driver. A model works without code
 as long as it uses these paths.
 
 - **Missing sensors are normal.** Offline models (Ellipse, 3S, Protection Station) do not
-  measure input or output voltage. While on utility power, `input_voltage` shows the UPS's
-  nominal voltage, because the component derives online status from it.
+  measure input or output voltage, so those sensors stay unknown.
+- **Online and on battery come from the UPS's status flags**, not from the input voltage.
+  `input_voltage` always shows what the UPS measures: a few volts in an outage (about 3 V on
+  the 5E), or the real mains voltage when a brownout puts the UPS on battery.
 - **Beeper and battery test** buttons work when the model exposes those controls; otherwise
   the log says the action is not supported. Beeper test and UPS (panel) test are not available.
 - **Delay settings (`number` entities) are not supported.** Eaton UPSes have no stored

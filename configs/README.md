@@ -486,3 +486,5 @@ interval:
 #### **Available Direct Access Methods**:
 **Boolean States**: `is_online()`, `is_on_battery()`, `is_low_battery()`, `is_charging()`, `has_fault()`, `is_overloaded()`  
 **Value Getters**: `get_battery_level()`, `get_input_voltage()`, `get_output_voltage()`, `get_load_percent()`, `get_runtime_minutes()`
+
+While no UPS is detected (not plugged in yet, unplugged, or not answering), the value getters return NaN and `is_online()`, `is_on_battery()`, `is_low_battery()`, `is_charging()` and `is_overloaded()` return false; `has_fault()` returns true. `is_connected()` tells whether a UPS is plugged in.
