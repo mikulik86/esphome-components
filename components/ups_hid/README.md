@@ -1,34 +1,34 @@
 # UPS HID Component for ESPHome
 
-A ESPHome component for monitoring UPS devices via USB connection on ESP32-S3. Direct USB HID communication with support for APC, CyberPower, Eaton, and generic HID UPS devices.
+A ESPHome component for monitoring UPS devices via USB connection on ESP32-S3 and ESP32-P4. Direct USB HID communication with support for APC, CyberPower, Eaton, and generic HID UPS devices.
 
 ## Features
 
 - 🔋 **Real-time UPS monitoring**: Battery level, voltages, load, runtime, status
 - 🧪 **UPS self-test control**: Battery tests (quick/deep), panel tests, with real-time result monitoring
-- 🔊 **Beeper control**: Enable/disable/mute/test UPS audible alarms via HID write operations
-- ⏱️ **Delay configuration**: Configure UPS shutdown, start, and reboot delays via USB HID
+- 🔊 **Beeper control**: Enable/disable/mute UPS audible alarms via HID write operations (beeper test on some models)
+- ⏱️ **Delay configuration**: Configure UPS shutdown, start, and reboot delays via USB HID (CyberPower and generic HID; APC and Eaton UPSes store no delays)
 - 🌈 **Visual status indicator**: RGB LED with customizable status colors
 - 🏠 **Home Assistant integration**: Automatic entity discovery via ESPHome API
 - 🔌 **Multi-protocol support**: APC HID, CyberPower HID, Eaton HID, Generic HID
 - 🎯 **Auto-detection**: Intelligent protocol detection based on USB vendor IDs
-- 🔧 **Robust USB handling**: ESP-IDF v5.4 compatible with 3-tier reconnection recovery
+- 🔧 **Robust USB handling**: the UPS is detected again after a USB replug, and unanswered requests time out safely
 - 🧪 **Simulation mode**: Test integration without physical UPS device
 
 ## Quick Start
 
 ### Hardware Requirements
 
-- **ESP32-S3-DevKitC-1 v1.1** with USB OTG support
+- **ESP32-S3** (e.g. ESP32-S3-DevKitC-1 v1.1) or **ESP32-P4** board with USB OTG support. The P4 is tested with ESPHome 2026.9.1.
 - **UPS device** with USB monitoring port
-- **USB cable** (UPS to ESP32-S3)
+- **USB cable** (UPS to the ESP32's USB OTG port)
 
 ### Minimal Configuration
 
 ```yaml
 # Quick start example - see configs/README.md for complete modular configurations
 external_components:
-  - source: github://bullshit/esphome-components
+  - source: github://mikulik86/esphome-components
     components: [ ups_hid ]  # Add more components as needed
 
 # Use modular configuration packages for maintainable setup
@@ -46,10 +46,10 @@ packages:
 
 ## Hardware Setup
 
-### ESP32-S3 USB OTG Connection
+### USB OTG Connection
 
 ```
-UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 USB OTG Port
+UPS USB Port (Type-B)  ←→  USB Cable  ←→  ESP32-S3 / ESP32-P4 USB OTG Port
 ```
 
 ### LED Status Indicators (Optional RGB LED on GPIO48)

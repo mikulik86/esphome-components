@@ -2,17 +2,42 @@
 
 A collection of ESPHome components for various hardware integrations and monitoring solutions.
 
+## About This Fork
+
+This is a fork of [bullshit/esphome-components](https://github.com/bullshit/esphome-components).
+It changes the `ups_hid` component:
+
+- **Eaton HID protocol** for Eaton and MGE UPSes, tested on an Eaton 5E 1500i
+- **APC protocol rebuilt** on the UPS's HID report descriptor with NUT's `apc-hid` paths, instead
+  of report numbers recorded from one unit. Tested on an APC Back-UPS BX2200MI.
+- **ESP32-P4** support, tested with ESPHome 2026.9.1
+- **Replugging**: the UPS is detected again after its USB cable is unplugged or swapped, without a reboot
+- **No stale values**: entities show *unknown* when the UPS stops reporting a value or is unplugged
+- **Status from the UPS itself**: online, on battery and overload come from the UPS's status flags
+  (APC, Eaton), and a new `replace_battery` binary sensor reports a worn battery
+- **Safe USB timeouts**: a request the UPS does not answer no longer leaves the USB stack
+  pointing at freed memory
+- **ESPHome 2026.9** compatibility, and builds without the button, number or text sensor platforms
+
+To use this fork in your ESPHome configuration:
+
+```yaml
+external_components:
+  - source: github://mikulik86/esphome-components
+    components: [ups_hid]
+```
+
 ## Available Components
 
 ### 🔋 UPS HID Component (`ups_hid`)
 
-Monitor UPS devices via direct USB connection on ESP32-S3. Supports APC, CyberPower, Eaton, and generic HID UPS devices with real-time monitoring of battery status, power conditions, and device information.
+Monitor UPS devices via direct USB connection on ESP32-S3 and ESP32-P4. Supports APC, CyberPower, Eaton, and generic HID UPS devices with real-time monitoring of battery status, power conditions, and device information.
 
 **Key Features:**
 - **Real-time UPS monitoring**: Battery, voltage, load, runtime, and 15+ sensors
 - **Multi-protocol support**: APC HID, CyberPower HID, Eaton HID, Generic HID with auto-detection
-- **UPS Control**: Beeper control (enable/disable/mute/test) and battery testing
-- ⏱️ **Delay configuration**: Configure UPS shutdown, start, and reboot delays via USB HID
+- **UPS Control**: Beeper control (enable/disable/mute) and battery testing, where the UPS supports them
+- ⏱️ **Delay configuration**: Configure UPS shutdown, start, and reboot delays via USB HID (CyberPower and generic HID)
 - **Home Assistant integration**: Full device discovery and management
 - **Developer-friendly**: Simulation mode, comprehensive logging
 
@@ -138,7 +163,7 @@ tools/
 
 Component-specific requirements are documented in each component's README:
 
-- **UPS HID**: ESP32-S3-DevKitC-1 v1.1 with USB OTG support
+- **UPS HID**: ESP32-S3 (e.g. ESP32-S3-DevKitC-1 v1.1) or ESP32-P4 with USB OTG support. Tested on an ESP32-P4 with ESPHome 2026.9.1 with an Eaton 5E 1500i and an APC Back-UPS BX2200MI.
 - **UPS Status LED**: WS2812 LED strip (1 LED), requires time component for night mode
 - **Future components**: Requirements will be listed here
 
